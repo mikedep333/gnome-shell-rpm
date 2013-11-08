@@ -1,0 +1,36 @@
+From 9712b5f8ce73aa40f74c33108cca12c35b50aee8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Mon, 4 Nov 2013 14:09:19 +0100
+Subject: [PATCH 3/3] screencast: Validate parameters of ScreencastArea
+
+... just as we do for screenshots.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=699752
+---
+ js/ui/screencast.js | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/js/ui/screencast.js b/js/ui/screencast.js
+index 7d8d767..168f589 100644
+--- a/js/ui/screencast.js
++++ b/js/ui/screencast.js
+@@ -127,6 +127,16 @@ const ScreencastService = new Lang.Class({
+         if (!recorder.is_recording()) {
+             let [x, y, width, height, fileTemplate, options] = params;
+ 
++            if (x < 0 || y < 0 ||
++                width <= 0 || height <= 0 ||
++                x + width > global.screen_width ||
++                y + height > global.screen_height) {
++                invocation.return_error_literal(Gio.IOErrorEnum,
++                                                Gio.IOErrorEnum.CANCELLED,
++                                                "Invalid params");
++                return;
++            }
++
+             recorder.set_file_template(fileTemplate);
+             recorder.set_area(x, y, width, height);
+             this._applyOptionalParameters(recorder, options);
+-- 
+1.8.4.2
+

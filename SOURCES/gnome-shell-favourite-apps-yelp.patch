@@ -1,0 +1,26 @@
+From 13e92bff3bf4c32476999916280e87cefa5d954b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 1 May 2013 01:33:16 +0200
+Subject: [PATCH] Add 'yelp' to default favorites
+
+Help should be easily available, so add it to the default favorites.
+---
+ data/org.gnome.shell.gschema.xml.in.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/org.gnome.shell.gschema.xml.in.in b/data/org.gnome.shell.gschema.xml.in.in
+index 27adddc..eee70b1 100644
+--- a/data/org.gnome.shell.gschema.xml.in.in
++++ b/data/org.gnome.shell.gschema.xml.in.in
+@@ -32,7 +32,7 @@
+       </_description>
+     </key>
+     <key name="favorite-apps" type="as">
+-      <default>[ 'firefox.desktop', 'evolution.desktop', 'empathy.desktop', 'rhythmbox.desktop', 'shotwell.desktop', 'libreoffice-writer.desktop', 'nautilus.desktop', 'gnome-documents.desktop' ]</default>
++      <default>[ 'firefox.desktop', 'evolution.desktop', 'empathy.desktop', 'rhythmbox.desktop', 'shotwell.desktop', 'libreoffice-writer.desktop', 'nautilus.desktop', 'gnome-documents.desktop', 'yelp.desktop' ]</default>
+       <_summary>List of desktop file IDs for favorite applications</_summary>
+       <_description>
+         The applications corresponding to these identifiers
+-- 
+1.8.2.1
+

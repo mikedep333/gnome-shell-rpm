@@ -1,0 +1,113 @@
+From aaecd03d5f14fe3332659ab4997b39448814abcd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 5 Sep 2013 15:37:12 +0200
+Subject: [PATCH] network: Don't disable switch in wifi section while
+ connecting
+
+Establishing a wireless connection may take some time during which
+users may change their mind and want to disable it (again).
+This is currently impossible, as we overlay the device status if
+the device is not fully (dis)connected. Instead, display this status
+on the active AP and leave the switch alone.
+---
+ js/ui/status/network.js | 57 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 56 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/status/network.js b/js/ui/status/network.js
+index ca4e462..370afa0 100644
+--- a/js/ui/status/network.js
++++ b/js/ui/status/network.js
+@@ -1,4 +1,5 @@
+ // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
++const Clutter = imports.gi.Clutter;
+ const GLib = imports.gi.GLib;
+ const GObject = imports.gi.GObject;
+ const Gio = imports.gi.Gio;
+@@ -122,8 +123,10 @@ const NMNetworkMenuItem = new Lang.Class({
+         this._label = new St.Label({ text: title });
+         this.actor.label_actor = this._label;
+         this.addActor(this._label);
++        this._stack = new St.Widget({ layout_manager: new Clutter.BinLayout() });
++        this.addActor(this._stack, { align: St.Align.END });
+         this._icons = new St.BoxLayout({ style_class: 'nm-menu-item-icons' });
+-        this.addActor(this._icons, { align: St.Align.END });
++        this._stack.add_actor(this._icons);
+ 
+         this._signalIcon = new St.Icon({ icon_name: this._getIcon(),
+                                          style_class: 'popup-menu-icon' });
+@@ -134,6 +137,8 @@ const NMNetworkMenuItem = new Lang.Class({
+             this.bestAP._secType != NMAccessPointSecurity.NONE)
+             this._secureIcon.icon_name = 'network-wireless-encrypted-symbolic';
+         this._icons.add_actor(this._secureIcon);
++        this._statusLabel = new St.Label({ visible: false });
++        this._stack.add_actor(this._statusLabel, { align: St.Align.END });
+     },
+ 
+     updateBestAP: function(ap) {
+@@ -141,6 +146,14 @@ const NMNetworkMenuItem = new Lang.Class({
+         this._signalIcon.icon_name = this._getIcon();
+     },
+ 
++    setStatus: function(status) {
++        let visible = status != null;
++        this._statusLabel.visible = visible;
++        this._icons.visible = !visible;
++
++        this._statusLabel.text = status;
++    },
++
+     _getIcon: function() {
+         if (this.bestAP.mode == NM80211Mode.ADHOC)
+             return 'network-workgroup-symbolic';
+@@ -1372,6 +1385,48 @@ const NMDeviceWireless = new Lang.Class({
+                                                                           'network-wireless-connected-symbolic',
+                                                                           { reactive: false });
+         this._activeConnectionItem.setShowDot(true);
++
++        if (this._activeNetwork)
++            this._activeConnectionItem.setStatus(this.getActiveStatusLabel());
++    },
++
++    getStatusLabel: function() {
++        if (!this.device)
++            return null;
++
++        switch(this.device.state) {
++        case NetworkManager.DeviceState.DEACTIVATING:
++        case NetworkManager.DeviceState.PREPARE:
++        case NetworkManager.DeviceState.CONFIG:
++        case NetworkManager.DeviceState.IP_CONFIG:
++        case NetworkManager.DeviceState.IP_CHECK:
++        case NetworkManager.DeviceState.SECONDARIES:
++        case NetworkManager.DeviceState.NEED_AUTH:
++            return null;
++        default:
++            return this.parent();
++        }
++    },
++
++    getActiveStatusLabel: function() {
++        if (!this.device)
++            return null;
++
++        switch(this.device.state) {
++        case NetworkManager.DeviceState.DEACTIVATING:
++            return _("disconnecting...");
++        case NetworkManager.DeviceState.PREPARE:
++        case NetworkManager.DeviceState.CONFIG:
++        case NetworkManager.DeviceState.IP_CONFIG:
++        case NetworkManager.DeviceState.IP_CHECK:
++        case NetworkManager.DeviceState.SECONDARIES:
++            return _("connecting...");
++        case NetworkManager.DeviceState.NEED_AUTH:
++            /* Translators: this is for network connections that require some kind of key or password */
++            return _("authentication required");
++        default:
++            return null;
++        }
+     },
+ 
+     _createAutomaticConnection: function(apObj) {
+-- 
+1.8.4.2
+

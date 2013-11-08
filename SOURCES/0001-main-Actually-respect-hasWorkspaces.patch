@@ -1,0 +1,82 @@
+From 9472b2a2d951be19df5069cca073ab7e7085c769 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 1 Nov 2013 00:49:22 +0100
+Subject: [PATCH] main: Actually respect hasWorkspaces
+
+We've long had the hasWorkspaces property, but it doesn't seem like
+it was ever used. Implement it so that we don't have workspaces in
+initial-setup mode.
+---
+ js/ui/main.js          |  2 +-
+ js/ui/windowManager.js | 14 +++++++++++++-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/js/ui/main.js b/js/ui/main.js
+index bd5dc47..2f0e28a 100644
+--- a/js/ui/main.js
++++ b/js/ui/main.js
+@@ -233,7 +233,7 @@ function _checkWorkspaces() {
+     let i;
+     let emptyWorkspaces = [];
+ 
+-    if (!Meta.prefs_get_dynamic_workspaces()) {
++    if (!sessionMode.hasWorkspaces || !Meta.prefs_get_dynamic_workspaces()) {
+         _checkWorkspacesId = 0;
+         return false;
+     }
+diff --git a/js/ui/windowManager.js b/js/ui/windowManager.js
+index b8ea36b..e4de557 100644
+--- a/js/ui/windowManager.js
++++ b/js/ui/windowManager.js
+@@ -568,7 +568,7 @@ const WindowManager = new Lang.Class({
+     },
+ 
+     _switchWorkspace : function(shellwm, from, to, direction) {
+-        if (!this._shouldAnimate()) {
++        if (!Main.sessionMode.hasWorkspaces || !this._shouldAnimate()) {
+             shellwm.completed_switch_workspace();
+             return;
+         }
+@@ -721,6 +721,9 @@ const WindowManager = new Lang.Class({
+     },
+ 
+     _showWorkspaceSwitcher : function(display, screen, window, binding) {
++        if (!Main.sessionMode.hasWorkspaces)
++            return;
++
+         if (screen.n_workspaces == 1)
+             return;
+ 
+@@ -738,6 +741,9 @@ const WindowManager = new Lang.Class({
+         else
+             newWs = this.actionMoveWindow(window, direction);
+ 
++        if (!newWs)
++            return;
++
+         if (!Main.overview.visible) {
+             if (this._workspaceSwitcherPopup == null) {
+                 this._workspaceSwitcherPopup = new WorkspaceSwitcherPopup.WorkspaceSwitcherPopup();
+@@ -750,6 +756,9 @@ const WindowManager = new Lang.Class({
+     },
+ 
+     actionMoveWorkspace: function(direction) {
++        if (!Main.sessionMode.hasWorkspaces)
++            return null;
++
+         let activeWorkspace = global.screen.get_active_workspace();
+         let toActivate = activeWorkspace.get_neighbor(direction);
+ 
+@@ -760,6 +769,9 @@ const WindowManager = new Lang.Class({
+     },
+ 
+     actionMoveWindow: function(window, direction) {
++        if (!Main.sessionMode.hasWorkspaces)
++            return null;
++
+         let activeWorkspace = global.screen.get_active_workspace();
+         let toActivate = activeWorkspace.get_neighbor(direction);
+ 
+-- 
+1.8.3.1
+

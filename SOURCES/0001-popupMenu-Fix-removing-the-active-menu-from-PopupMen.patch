@@ -1,0 +1,30 @@
+From 820f689f7789be074595ce470d39828db771ed66 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 6 Nov 2013 23:40:22 +0100
+Subject: [PATCH] popupMenu: Fix removing the active menu from PopupMenuManager
+
+Commit b42af9aa991eba5 changed the parameter list of _closeMenu()
+to account for changes in the GrabHelper ungrab mechanism, but
+didn't update other callers.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=709806
+---
+ js/ui/popupMenu.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/popupMenu.js b/js/ui/popupMenu.js
+index 9456b79..81d8ab9 100644
+--- a/js/ui/popupMenu.js
++++ b/js/ui/popupMenu.js
+@@ -2106,7 +2106,7 @@ const PopupMenuManager = new Lang.Class({
+ 
+     removeMenu: function(menu) {
+         if (menu == this.activeMenu)
+-            this._closeMenu(menu);
++            this._closeMenu(false, menu);
+ 
+         let position = this._findMenu(menu);
+         if (position == -1) // not a menu we manage
+-- 
+1.8.4.2
+
