@@ -1,0 +1,130 @@
+From c23b174119abf62fec5c05b461cc3c5a7ec4bc08 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 7 Mar 2014 16:16:20 +0100
+Subject: [PATCH 1/2] loginDialog: Add missing return value
+
+_loadUserList() may be used as idle handler, so we should explicitly
+return a boolean.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=725905
+---
+ js/gdm/loginDialog.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
+index ee0199c..98dd7b2 100644
+--- a/js/gdm/loginDialog.js
++++ b/js/gdm/loginDialog.js
+@@ -940,6 +940,8 @@ const LoginDialog = new Lang.Class({
+                                   Lang.bind(this, function(userManager, user) {
+                                       this._userList.removeUser(user);
+                                   }));
++
++        return false;
+     },
+ 
+     open: function() {
+-- 
+1.9.0
+
+
+From 5517e6bdbbc42347e03068d823dd215e9c86eb4d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Sat, 8 Mar 2014 00:05:24 +0100
+Subject: [PATCH 2/2] loginDialog: Defer loading user list until needed
+
+Loading the user list can be expensive, for instance when there is
+a large number of users and/or their avatars have to be fetched over
+the network. In case the user list is disabled anyway, there is no
+point in doing that work just to hide it, so stop doing that.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=725905
+---
+ js/gdm/loginDialog.js | 44 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 29 insertions(+), 15 deletions(-)
+
+diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
+index 98dd7b2..b4487e6 100644
+--- a/js/gdm/loginDialog.js
++++ b/js/gdm/loginDialog.js
+@@ -520,18 +520,6 @@ const LoginDialog = new Lang.Class({
+         this.actor.set_child_above_sibling(this._userSelectionBox, null);
+         this.actor.set_child_above_sibling(this._authPrompt.actor, null);
+ 
+-        if (!this._userManager.is_loaded)
+-            this._userManagerLoadedId = this._userManager.connect('notify::is-loaded',
+-                                                                  Lang.bind(this, function() {
+-                                                                      if (this._userManager.is_loaded) {
+-                                                                          this._loadUserList();
+-                                                                          this._userManager.disconnect(this._userManagerLoadedId);
+-                                                                          this._userManagerLoadedId = 0;
+-                                                                      }
+-                                                                  }));
+-        else
+-            GLib.idle_add(GLib.PRIORITY_DEFAULT, Lang.bind(this, this._loadUserList));
+-
+         this._userList.connect('activate',
+                                Lang.bind(this, function(userList, item) {
+                                    this._onUserListActivated(item);
+@@ -547,7 +535,29 @@ const LoginDialog = new Lang.Class({
+         this._sessionMenuButton.actor.show();
+         this._authPrompt.addActorToDefaultButtonWell(this._sessionMenuButton.actor);
+ 
+-   },
++        this._disableUserList = undefined;
++        this._userListLoaded = false;
++
++        // If the user list is enabled, it should take key focus; make sure the
++        // screen shield is initialized first to prevent it from stealing the
++        // focus later
++        Main.layoutManager.connect('startup-complete',
++                                   Lang.bind(this, this._updateDisableUserList));
++    },
++
++    _ensureUserListLoaded: function() {
++        if (!this._userManager.is_loaded)
++            this._userManagerLoadedId = this._userManager.connect('notify::is-loaded',
++                                                                  Lang.bind(this, function() {
++                                                                      if (this._userManager.is_loaded) {
++                                                                          this._loadUserList();
++                                                                          this._userManager.disconnect(this._userManagerLoadedId);
++                                                                          this._userManagerLoadedId = 0;
++                                                                      }
++                                                                  }));
++        else
++            GLib.idle_add(GLib.PRIORITY_DEFAULT, Lang.bind(this, this._loadUserList));
++    },
+ 
+     _updateDisableUserList: function() {
+         let disableUserList = this._settings.get_boolean(GdmUtil.DISABLE_USER_LIST_KEY);
+@@ -880,6 +890,7 @@ const LoginDialog = new Lang.Class({
+     },
+ 
+     _showUserList: function() {
++        this._ensureUserListLoaded();
+         this._authPrompt.hide();
+         this._sessionMenuButton.close();
+         this._setUserListExpanded(true);
+@@ -923,14 +934,17 @@ const LoginDialog = new Lang.Class({
+     },
+ 
+     _loadUserList: function() {
++        if (this._userListLoaded)
++            return false;
++
++        this._userListLoaded = true;
++
+         let users = this._userManager.list_users();
+ 
+         for (let i = 0; i < users.length; i++) {
+             this._userList.addUser(users[i]);
+         }
+ 
+-        this._updateDisableUserList();
+-
+         this._userManager.connect('user-added',
+                                   Lang.bind(this, function(userManager, user) {
+                                       this._userList.addUser(user);
+-- 
+1.9.0
+

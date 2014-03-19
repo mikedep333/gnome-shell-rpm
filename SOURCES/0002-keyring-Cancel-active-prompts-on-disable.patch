@@ -1,0 +1,50 @@
+From ba64565bf9be6d827fbbf4dd4de1998b770956ed Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 27 Sep 2013 16:04:25 +0200
+Subject: [PATCH 2/2] keyring: Cancel active prompts on disable()
+
+Since commit 1242a16265d5bf2, we will use a fake prompt which
+cancels alls requests without dialog when the keyring component
+is disabled. However this does only apply to new requests, dialogs
+that are already active when the session mode changes are kept
+open. This is not quite as expected, so cancel the prompt in that
+case.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=708910
+---
+ js/ui/components/keyring.js | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/components/keyring.js b/js/ui/components/keyring.js
+index 6de3965..5f7813b 100644
+--- a/js/ui/components/keyring.js
++++ b/js/ui/components/keyring.js
+@@ -246,11 +246,13 @@ const KeyringPrompter = new Lang.Class({
+             function() {
+                 let dialog = this._enabled ? new KeyringDialog()
+                                            : new KeyringDummyDialog();
+-                return dialog.prompt;
++                this._currentPrompt = dialog.prompt;
++                return this._currentPrompt;
+             }));
+         this._dbusId = null;
+         this._registered = false;
+         this._enabled = false;
++        this._currentPrompt = null;
+     },
+ 
+     enable: function() {
+@@ -265,6 +267,10 @@ const KeyringPrompter = new Lang.Class({
+ 
+     disable: function() {
+         this._enabled = false;
++
++        if (this._prompter.prompting)
++            this._currentPrompt.cancel();
++        this._currentPrompt = null;
+     }
+ });
+ 
+-- 
+1.8.4.2
+

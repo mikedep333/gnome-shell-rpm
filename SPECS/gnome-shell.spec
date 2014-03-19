@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.8.4
-Release:        14%{?dist}
+Release:        31%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -14,14 +14,25 @@ Source1:	org.gnome.shell.gschema.override
 # Replace Epiphany with Firefox in the default favourite apps list
 Patch1: gnome-shell-favourite-apps-firefox.patch
 Patch2: gnome-shell-favourite-apps-yelp.patch
+Patch3: gnome-shell-favourite-apps-terminal.patch
+Patch4: gnome-shell-favourite-apps-empathy.patch
 
 Patch10: 0001-popupMenu-Fix-removing-the-active-menu-from-PopupMen.patch
 Patch11: 0001-catch-more-errors-on-extensions-enable-and-disable.patch
 
+Patch20: 0001-main-allow-session-mode-to-be-specified-in-the-envir.patch
+
 Patch30: 0001-network-Do-not-use-timestamp-to-identify-connections.patch
 Patch31: 0001-network-Don-t-disable-switch-in-wifi-section-while-c.patch
 
+Patch40: fix-remote-search-provider-loading.patch
+
+Patch50: fix-background-leaks.patch
+
 Patch60: 0001-main-Actually-respect-hasWorkspaces.patch
+Patch61: 0001-main-Close-runDialog-as-necessary-on-session-mode-ch.patch
+Patch62: 0001-keyring-Don-t-unregister-the-prompt-when-disabled.patch
+Patch63: 0002-keyring-Cancel-active-prompts-on-disable.patch
 
 Patch70: 0001-screenshot-Extend-ScreenshotArea-parameter-validatio.patch
 Patch71: 0002-screencast-Fix-disabling-screencasts-via-session-mod.patch
@@ -30,8 +41,11 @@ Patch72: 0003-screencast-Validate-parameters-of-ScreencastArea.patch
 Patch80: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
 Patch81: 0002-extensions-Add-a-SESSION_MODE-extension-type.patch
 
+Patch90: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
+
 Patch99: login-screen-backport.patch
 Patch100: gdm-support-pre-authenticated-logins-from-oVirt.patch
+Patch101: dont-load-user-list-when-disabled.patch
 
 %define clutter_version 1.13.4
 %define gnome_bluetooth_version 3.5.5
@@ -143,14 +157,25 @@ be used only by extensions.gnome.org.
 %setup -q
 %patch1 -p1 -b .firefox
 %patch2 -p1 -b .yelp
+%patch3 -p1 -b .terminal
+%patch4 -p1 -b .empathy
 
 %patch10 -p1 -b .fix-popup-menu-manager-exception
 %patch11 -p1 -b .catch-extension-errors
 
+%patch20 -p1 -b .main-allow-session-mode-to-be-specified-in-the-envir
+
 %patch30 -p1 -b .fix-stuck-network-icon
 %patch31 -p1 -b .keep-wifi-switch
 
+%patch40 -p1 -b .fix-remote-search-provider-loading
+
+%patch50 -p1 -b .fix-background-leaks
+
 %patch60 -p1 -b .support-has-workspaces
+%patch61 -p1 -b .close-run-dialog-on-lock
+%patch62 -p1 -b .prevent-fallback-keyring-dialog
+%patch63 -p1 -b .cancel-keyring-dialog-on-lock
 
 %patch70 -p1 -b .validate-screenshot-params
 %patch71 -p1 -b .fix-disable-screencasts
@@ -159,8 +184,11 @@ be used only by extensions.gnome.org.
 %patch80 -p1
 %patch81 -p1
 
+%patch90 -p1 -b .panel-add-an-icon-to-the-ActivitiesButton
+
 %patch99 -p1 -b .login-screen-backport
 %patch100 -p1 -b .gdm-support-pre-authenticated-logins-from-oVirt
+%patch101 -p1 -b .dont-load-user-list-when-disabled
 
 %build
 autoreconf -f
@@ -232,6 +260,68 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Wed Mar 19 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-31
+- Fix some more background memory leaks
+  Resolves: rhbz#1027192
+
+* Wed Mar 12 2014 Ray Strode <rstrode@redhat.com> 3.8.4-30
+- Fix automatic shield lifting when smartcard is inserted
+  Resolves: #1063488
+
+* Mon Mar 10 2014 Ray Strode <rstrode@redhat.com> 3.8.4-29
+- Don't show user list if require smartcard is true
+  Resolves: #1063390
+
+* Mon Mar 10 2014 Ray Strode <rstrode@redhat.com> 3.8.4-28
+- Only react to login token (not any token) when performing unlock
+  Resolves: #1064972
+
+* Sat Mar 08 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-27
+- Backport background memory leak fixes
+  Resolves: rhbz#1027192
+
+* Sat Mar 08 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-26
+- Do not load user list in login screen when disabled
+  Resolves: rhbz#1053102
+
+* Thu Mar 06 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-25
+- Fix loading of remote search providers
+  Resolves: #1030948
+
+* Mon Feb 17 2014 Ray Strode <rstrode@redhat.com> 3.8.4-24
+- Make login banner more prominent
+  Resolves: #1061996
+
+* Wed Jan 29 2014 Ray Strode <rstrode@redhat.com> 3.8.4-23
+- Fix traceback in log
+  Resolves: #1034966
+
+* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 3.8.4-22
+- Mass rebuild 2014-01-24
+
+* Tue Jan 21 2014 Ray Strode <rstrode@redhat.com> 3.8.4-21
+- Add branding next to activities button
+  Resolves: #1052984
+
+* Mon Jan 13 2014 Ray Strode <rstrode@redhat.com> 3.8.4-20
+- Fix undefined variable
+  Resolves: #1049897
+
+* Wed Jan 08 2014 Ray Strode <rstrode@redhat.com> 3.8.4-19
+- Allow session mode to be specified by environment variable
+
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 3.8.4-18
+- Mass rebuild 2013-12-27
+
+* Wed Dec  4 2013 Matthias Clasen <mclasen@redhat.com> - 3.8.4-17
+- Add gnome-terminal to favorites, remove empathy
+- Resolves: #1038168
+
+* Fri Nov 15 2013 Florian Müllner <fmuellner@redhat.com> - 3.8.4-15
+- Close run dialog on mode changes when the new session mode doesn't allow it
+  Resolves: rhbz#1031142
+- Prevent fallback keyring dialog to appear on lock screen
+
 * Fri Nov  8 2013 Rui Matos <rmatos@redhat.com> - 3.8.4-14
 - Add a DBus method to load a single extension
   Resolves: rhbz#1028466

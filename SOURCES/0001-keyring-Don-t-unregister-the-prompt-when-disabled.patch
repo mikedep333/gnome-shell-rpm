@@ -1,0 +1,83 @@
+From 17c5b2b32b99185beb7565856d0bc247b7ba9ed4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 18 Sep 2013 17:53:26 +0200
+Subject: [PATCH 1/2] keyring: Don't unregister the prompt when disabled
+
+gnome-keyring provides a fallback in case our builtin prompt fails
+to register, so keyring dialogs may still pop up even when they
+are supposed to be disabled.
+Instead, keep the prompt registered but cancel requests immediately
+while disabled.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=708187
+---
+ js/ui/components/keyring.js | 41 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 32 insertions(+), 9 deletions(-)
+
+diff --git a/js/ui/components/keyring.js b/js/ui/components/keyring.js
+index 299ecc6..6de3965 100644
+--- a/js/ui/components/keyring.js
++++ b/js/ui/components/keyring.js
+@@ -221,27 +221,50 @@ const KeyringDialog = new Lang.Class({
+     },
+ });
+ 
++const KeyringDummyDialog = new Lang.Class({
++    Name: 'KeyringDummyDialog',
++
++    _init: function() {
++        this.prompt = new Shell.KeyringPrompt();
++        this.prompt.connect('show-password',
++                            Lang.bind(this, this._cancelPrompt));
++        this.prompt.connect('show-confirm', Lang.bind(this,
++                            this._cancelPrompt));
++    },
++
++    _cancelPrompt: function() {
++        this.prompt.cancel();
++    }
++});
++
+ const KeyringPrompter = new Lang.Class({
+     Name: 'KeyringPrompter',
+ 
+     _init: function() {
+         this._prompter = new Gcr.SystemPrompter();
+-        this._prompter.connect('new-prompt', function(prompter) {
+-            let dialog = new KeyringDialog();
+-            return dialog.prompt;
+-        });
++        this._prompter.connect('new-prompt', Lang.bind(this,
++            function() {
++                let dialog = this._enabled ? new KeyringDialog()
++                                           : new KeyringDummyDialog();
++                return dialog.prompt;
++            }));
+         this._dbusId = null;
++        this._registered = false;
++        this._enabled = false;
+     },
+ 
+     enable: function() {
+-        this._prompter.register(Gio.DBus.session);
+-        this._dbusId = Gio.DBus.session.own_name('org.gnome.keyring.SystemPrompter',
+-                                                 Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT, null, null);
++        if (!this._registered) {
++            this._prompter.register(Gio.DBus.session);
++            this._dbusId = Gio.DBus.session.own_name('org.gnome.keyring.SystemPrompter',
++                                                     Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT, null, null);
++            this._registered = true;
++        }
++        this._enabled = true;
+     },
+ 
+     disable: function() {
+-        this._prompter.unregister(false);
+-        Gio.DBus.session.unown_name(this._dbusId);
++        this._enabled = false;
+     }
+ });
+ 
+-- 
+1.8.4.2
+

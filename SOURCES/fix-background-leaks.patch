@@ -1,0 +1,777 @@
+From cdee11381cfb10a93fb41d014b989a4968068b0c Mon Sep 17 00:00:00 2001
+From: Adel Gadllah <adel.gadllah@gmail.com>
+Date: Thu, 15 Aug 2013 21:51:46 +0200
+Subject: [PATCH 01/13] Revert "background: fix asynchronous management of
+ background loading operations"
+
+This reverts commit 1020d8a0f8523a04d8336b1348388b8b242e414f.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=704646
+---
+ js/ui/background.js | 69 +++++++++++++++++++----------------------------------
+ 1 file changed, 25 insertions(+), 44 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 13343c6..1d9ab7c 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -142,40 +142,33 @@ const BackgroundCache = new Lang.Class({
+                                         cancellable: null,
+                                         onFinished: null });
+ 
+-        let fileLoad = { filename: params.filename,
+-                         style: params.style,
+-                         shouldCopy: false,
+-                         monitorIndex: params.monitorIndex,
+-                         effects: params.effects,
+-                         onFinished: params.onFinished,
+-                         cancellable: new Gio.Cancellable(), };
+-        this._pendingFileLoads.push(fileLoad);
+-
+-        if (params.cancellable) {
+-            params.cancellable.connect(Lang.bind(this, function(c) {
+-               fileLoad.cancellable.cancel();
+-            }));
++        for (let i = 0; i < this._pendingFileLoads.length; i++) {
++            if (this._pendingFileLoads[i].filename == params.filename &&
++                this._pendingFileLoads[i].style == params.style) {
++                this._pendingFileLoads[i].callers.push({ shouldCopy: true,
++                                                         monitorIndex: params.monitorIndex,
++                                                         effects: params.effects,
++                                                         onFinished: params.onFinished });
++                return;
++            }
+         }
+ 
++        this._pendingFileLoads.push({ filename: params.filename,
++                                      style: params.style,
++                                      callers: [{ shouldCopy: false,
++                                                  monitorIndex: params.monitorIndex,
++                                                  effects: params.effects,
++                                                  onFinished: params.onFinished }] });
++
+         let content = new Meta.Background({ meta_screen: global.screen,
+                                             monitor: params.monitorIndex,
+                                             effects: params.effects });
+ 
+         content.load_file_async(params.filename,
+                                 params.style,
+-                                fileLoad.cancellable,
++                                params.cancellable,
+                                 Lang.bind(this,
+                                           function(object, result) {
+-                                              if (fileLoad.cancellable.is_cancelled()) {
+-                                                  if (params.cancellable && params.cancellable.is_cancelled()) {
+-                                                      if (params.onFinished)
+-                                                          params.onFinished(null);
+-                                                      this._removePendingFileLoad(fileLoad);
+-                                                      return;
+-                                                  }
+-                                                  return;
+-                                              }
+-
+                                               try {
+                                                   content.load_file_finish(result);
+ 
+@@ -185,25 +178,22 @@ const BackgroundCache = new Lang.Class({
+                                                   content = null;
+                                               }
+ 
+-                                              let needsCopy = false;
+                                               for (let i = 0; i < this._pendingFileLoads.length; i++) {
+                                                   let pendingLoad = this._pendingFileLoads[i];
+                                                   if (pendingLoad.filename != params.filename ||
+                                                       pendingLoad.style != params.style)
+                                                       continue;
+ 
+-                                                  if (pendingLoad.cancellable.is_cancelled())
+-                                                      continue;
++                                                  for (let j = 0; j < pendingLoad.callers.length; j++) {
++                                                      if (pendingLoad.callers[j].onFinished) {
++                                                          if (content && pendingLoad.callers[j].shouldCopy) {
++                                                              content = object.copy(pendingLoad.callers[j].monitorIndex,
++                                                                                    pendingLoad.callers[j].effects);
+ 
+-                                                  pendingLoad.cancellable.cancel();
+-                                                  if (pendingLoad.onFinished) {
+-                                                      if (content && needsCopy) {
+-                                                          content = object.copy(pendingLoad.monitorIndex,
+-                                                                                pendingLoad.effects);
+-                                                      }
++                                                          }
+ 
+-                                                      needsCopy = true;
+-                                                      pendingLoad.onFinished(content);
++                                                          pendingLoad.callers[j].onFinished(content);
++                                                      }
+                                                   }
+ 
+                                                   this._pendingFileLoads.splice(i, 1);
+@@ -211,15 +201,6 @@ const BackgroundCache = new Lang.Class({
+                                           }));
+     },
+ 
+-    _removePendingFileLoad: function(fileLoad) {
+-        for (let i = 0; i < this._pendingFileLoads.length; i++) {
+-            if (this._pendingFileLoads[i].cancellable == fileLoad.cancellable) {
+-                this._pendingFileLoads.splice(i, 1);
+-                break;
+-            }
+-        }
+-    },
+-
+     getImageContent: function(params) {
+         params = Params.parse(params, { monitorIndex: 0,
+                                         style: null,
+-- 
+1.9.0
+
+
+From 980a8618e1b89911c93183c461528bc9c3d465de Mon Sep 17 00:00:00 2001
+From: Adel Gadllah <adel.gadllah@gmail.com>
+Date: Wed, 2 Oct 2013 15:29:30 +0200
+Subject: [PATCH 02/13] background: Disconnect settings signal handler on
+ destroy
+
+We connect to the changed signal in _init() but never actually disconnect from
+it. The callback has a reference to "this" which results into the background
+object not getting garbage collected.
+
+Fix that leaks by disconnecting in _destroy()
+
+https://bugzilla.gnome.org/show_bug.cgi?id=709263
+---
+ js/ui/background.js | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 1d9ab7c..b855b4e 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -318,9 +318,9 @@ const Background = new Lang.Class({
+         this._cancellable = new Gio.Cancellable();
+         this.isLoaded = false;
+ 
+-        this._settings.connect('changed', Lang.bind(this, function() {
+-                                   this.emit('changed');
+-                               }));
++        this._settingsChangedSignalId = this._settings.connect('changed', Lang.bind(this, function() {
++                                            this.emit('changed');
++                                        }));
+ 
+         this._load();
+     },
+@@ -361,6 +361,10 @@ const Background = new Lang.Class({
+ 
+         this.actor.disconnect(this._destroySignalId);
+         this._destroySignalId = 0;
++
++        if (this._settingsChangedSignalId != 0)
++            this._settings.disconnect(this._settingsChangedSignalId);
++        this._settingsChangedSignalId = 0;
+     },
+ 
+     _setLoaded: function() {
+-- 
+1.9.0
+
+
+From cfe72aa21a0aa8ea96dac81bfd6e532af62e9081 Mon Sep 17 00:00:00 2001
+From: Adel Gadllah <adel.gadllah@gmail.com>
+Date: Wed, 2 Oct 2013 15:48:39 +0200
+Subject: [PATCH 03/13] layout: Use monitor index when adding bg managers
+
+Don't assume that this._bgManagers.push() (i.e adding to the end) is always
+correct.
+
+On startup we call _createPrimaryBackground which passes in the primary index
+which may not be 0.
+---
+ js/ui/layout.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/layout.js b/js/ui/layout.js
+index e25b3bd..141eecc 100644
+--- a/js/ui/layout.js
++++ b/js/ui/layout.js
+@@ -347,7 +347,7 @@ const LayoutManager = new Lang.Class({
+                               BackgroundMenu.addBackgroundMenu(bgManager.background.actor);
+                           }));
+ 
+-        this._bgManagers.push(bgManager);
++        this._bgManagers[monitorIndex] = bgManager;
+ 
+         return bgManager.background;
+     },
+-- 
+1.9.0
+
+
+From 304c11552766963f51343d97f8257096e62abb15 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 14 Mar 2014 18:09:22 +0100
+Subject: [PATCH 04/13] background: Force a GC run after removing a background
+
+---
+ js/ui/background.js | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index b855b4e..0e4ff5d 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -6,8 +6,10 @@ const Gio = imports.gi.Gio;
+ const GLib = imports.gi.GLib;
+ const GnomeDesktop = imports.gi.GnomeDesktop;
+ const Lang = imports.lang;
++const Mainloop = imports.mainloop;
+ const Meta = imports.gi.Meta;
+ const Signals = imports.signals;
++const System = imports.system;
+ 
+ const Main = imports.ui.main;
+ const Params = imports.misc.params;
+@@ -119,6 +121,14 @@ const BackgroundCache = new Lang.Class({
+ 
+         if (index >= 0)
+             contentList.splice(index, 1);
++
++        if (!this._gcId)
++            this._gcId = Mainloop.idle_add(Lang.bind(this,
++                function() {
++                    System.gc();
++                    this._gcId = 0;
++                    return false;
++                }));
+     },
+ 
+     removePatternContent: function(content) {
+-- 
+1.9.0
+
+
+From 1cd71c438f3ee5dc6ccbc68ef646d42128e6883b Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Tue, 3 Dec 2013 18:08:42 -0500
+Subject: [PATCH 05/13] background: Clarify the intent of the code
+
+Stomping on local variables and trying to keep loop state isn't
+too fun. Just use a new variable here so we aren't too confused
+with what we're doing.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=719803
+---
+ js/ui/background.js | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 0e4ff5d..80a3bba 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -196,13 +196,16 @@ const BackgroundCache = new Lang.Class({
+ 
+                                                   for (let j = 0; j < pendingLoad.callers.length; j++) {
+                                                       if (pendingLoad.callers[j].onFinished) {
+-                                                          if (content && pendingLoad.callers[j].shouldCopy) {
+-                                                              content = object.copy(pendingLoad.callers[j].monitorIndex,
+-                                                                                    pendingLoad.callers[j].effects);
++                                                          let newContent;
+ 
++                                                          if (content && pendingLoad.callers[j].shouldCopy) {
++                                                              newContent = content.copy(pendingLoad.callers[j].monitorIndex,
++                                                                                        pendingLoad.callers[j].effects);
++                                                          } else {
++                                                              newContent = content;
+                                                           }
+ 
+-                                                          pendingLoad.callers[j].onFinished(content);
++                                                          pendingLoad.callers[j].onFinished(newContent);
+                                                       }
+                                                   }
+ 
+-- 
+1.9.0
+
+
+From f86064aaf8753050582ead02d329aa9c36d0447c Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Tue, 3 Dec 2013 18:09:23 -0500
+Subject: [PATCH 06/13] background: Add copied content from pending image loads
+ to the cache
+
+https://bugzilla.gnome.org/show_bug.cgi?id=719803
+---
+ js/ui/background.js | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 80a3bba..6349148 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -201,6 +201,7 @@ const BackgroundCache = new Lang.Class({
+                                                           if (content && pendingLoad.callers[j].shouldCopy) {
+                                                               newContent = content.copy(pendingLoad.callers[j].monitorIndex,
+                                                                                         pendingLoad.callers[j].effects);
++                                                              this._images.push(newContent);
+                                                           } else {
+                                                               newContent = content;
+                                                           }
+-- 
+1.9.0
+
+
+From 8964898af8dde2e425d5fde711d2e572d87249d3 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 26 Feb 2014 14:35:38 -0500
+Subject: [PATCH 07/13] background: always copy background content when loading
+ into cache
+
+Copying is actually a lightweight operation, so trying to avoid it just adds
+code complexity for little gain.
+
+Based on work from Jasper St. Pierre <jstpierre@macheye.net>
+
+https://bugzilla.gnome.org/show_bug.cgi?id=722149
+---
+ js/ui/background.js | 15 ++++-----------
+ 1 file changed, 4 insertions(+), 11 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 6349148..1e4d2ae 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -155,8 +155,7 @@ const BackgroundCache = new Lang.Class({
+         for (let i = 0; i < this._pendingFileLoads.length; i++) {
+             if (this._pendingFileLoads[i].filename == params.filename &&
+                 this._pendingFileLoads[i].style == params.style) {
+-                this._pendingFileLoads[i].callers.push({ shouldCopy: true,
+-                                                         monitorIndex: params.monitorIndex,
++                this._pendingFileLoads[i].callers.push({ monitorIndex: params.monitorIndex,
+                                                          effects: params.effects,
+                                                          onFinished: params.onFinished });
+                 return;
+@@ -165,14 +164,11 @@ const BackgroundCache = new Lang.Class({
+ 
+         this._pendingFileLoads.push({ filename: params.filename,
+                                       style: params.style,
+-                                      callers: [{ shouldCopy: false,
+-                                                  monitorIndex: params.monitorIndex,
++                                      callers: [{ monitorIndex: params.monitorIndex,
+                                                   effects: params.effects,
+                                                   onFinished: params.onFinished }] });
+ 
+-        let content = new Meta.Background({ meta_screen: global.screen,
+-                                            monitor: params.monitorIndex,
+-                                            effects: params.effects });
++        let content = new Meta.Background({ meta_screen: global.screen });
+ 
+         content.load_file_async(params.filename,
+                                 params.style,
+@@ -183,7 +179,6 @@ const BackgroundCache = new Lang.Class({
+                                                   content.load_file_finish(result);
+ 
+                                                   this._monitorFile(params.filename);
+-                                                  this._images.push(content);
+                                               } catch(e) {
+                                                   content = null;
+                                               }
+@@ -198,12 +193,10 @@ const BackgroundCache = new Lang.Class({
+                                                       if (pendingLoad.callers[j].onFinished) {
+                                                           let newContent;
+ 
+-                                                          if (content && pendingLoad.callers[j].shouldCopy) {
++                                                          if (content) {
+                                                               newContent = content.copy(pendingLoad.callers[j].monitorIndex,
+                                                                                         pendingLoad.callers[j].effects);
+                                                               this._images.push(newContent);
+-                                                          } else {
+-                                                              newContent = content;
+                                                           }
+ 
+                                                           pendingLoad.callers[j].onFinished(newContent);
+-- 
+1.9.0
+
+
+From 0975134611b07d35cc9dff9c1451c1dc8a2cbafc Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 26 Feb 2014 15:13:21 -0500
+Subject: [PATCH 08/13] background: refactor file loading
+
+This commit moves the code around a bit such that the
+caller gets allocated up front and then a file load is either
+found or created to attach the caller to.
+
+Functionally, the code is the same, it's just now factored in a way
+that will make it easier to fix a bug with cancellation later.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=722149
+---
+ js/ui/background.js | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 1e4d2ae..63b62a0 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -144,6 +144,10 @@ const BackgroundCache = new Lang.Class({
+         this._removeContent(this._images, content);
+     },
+ 
++    _attachCallerToFileLoad: function(caller, fileLoad) {
++        fileLoad.callers.push(caller);
++    },
++
+     _loadImageContent: function(params) {
+         params = Params.parse(params, { monitorIndex: 0,
+                                         style: null,
+@@ -152,21 +156,24 @@ const BackgroundCache = new Lang.Class({
+                                         cancellable: null,
+                                         onFinished: null });
+ 
++        let caller = { monitorIndex: params.monitorIndex,
++                       effects: params.effects,
++                       onFinished: params.onFinished };
++
+         for (let i = 0; i < this._pendingFileLoads.length; i++) {
+-            if (this._pendingFileLoads[i].filename == params.filename &&
+-                this._pendingFileLoads[i].style == params.style) {
+-                this._pendingFileLoads[i].callers.push({ monitorIndex: params.monitorIndex,
+-                                                         effects: params.effects,
+-                                                         onFinished: params.onFinished });
++            let fileLoad = this._pendingFileLoads[i];
++
++            if (fileLoad.filename == params.filename &&
++                fileLoad.style == params.style) {
++                this._attachCallerToFileLoad(caller, fileLoad);
+                 return;
+             }
+         }
+ 
+-        this._pendingFileLoads.push({ filename: params.filename,
+-                                      style: params.style,
+-                                      callers: [{ monitorIndex: params.monitorIndex,
+-                                                  effects: params.effects,
+-                                                  onFinished: params.onFinished }] });
++        let fileLoad = { filename: params.filename,
++                         style: params.style,
++                         callers: [] };
++        this._attachCallerToFileLoad(caller, fileLoad);
+ 
+         let content = new Meta.Background({ meta_screen: global.screen });
+ 
+-- 
+1.9.0
+
+
+From d5fdad361b7224e811921004be0d096cffb18f41 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 26 Feb 2014 16:09:26 -0500
+Subject: [PATCH 09/13] background: get rid of nested loop when finishing file
+ loading
+
+At the moment when a file is loaded, we iterate through the list of
+pending file loads and ignore any unrelated to the file, then iterate
+all the callers of the related file loads and finish them.
+
+In fact, there can only ever be one pending file load related to the
+file, and we already know it, so we can avoid the ugly nested loops.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=722149
+---
+ js/ui/background.js | 32 +++++++++++++-------------------
+ 1 file changed, 13 insertions(+), 19 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 63b62a0..417f70d 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -190,28 +190,22 @@ const BackgroundCache = new Lang.Class({
+                                                   content = null;
+                                               }
+ 
+-                                              for (let i = 0; i < this._pendingFileLoads.length; i++) {
+-                                                  let pendingLoad = this._pendingFileLoads[i];
+-                                                  if (pendingLoad.filename != params.filename ||
+-                                                      pendingLoad.style != params.style)
+-                                                      continue;
+-
+-                                                  for (let j = 0; j < pendingLoad.callers.length; j++) {
+-                                                      if (pendingLoad.callers[j].onFinished) {
+-                                                          let newContent;
+-
+-                                                          if (content) {
+-                                                              newContent = content.copy(pendingLoad.callers[j].monitorIndex,
+-                                                                                        pendingLoad.callers[j].effects);
+-                                                              this._images.push(newContent);
+-                                                          }
+-
+-                                                          pendingLoad.callers[j].onFinished(newContent);
++                                              for (let i = 0; i < fileLoad.callers.length; i++) {
++                                                  let caller = fileLoad.callers[i];
++                                                  if (caller.onFinished) {
++                                                      let newContent;
++
++                                                      if (content) {
++                                                          newContent = content.copy(caller.monitorIndex, caller.effects);
++                                                          this._images.push(newContent);
+                                                       }
+-                                                  }
+ 
+-                                                  this._pendingFileLoads.splice(i, 1);
++                                                      caller.onFinished(newContent);
++                                                  }
+                                               }
++
++                                              let idx = this._pendingFileLoads.indexOf(fileLoad);
++                                              this._pendingFileLoads.splice(idx, 1);
+                                           }));
+     },
+ 
+-- 
+1.9.0
+
+
+From ef3fe7c12368f05e5187b89eb88a7454b9d43193 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 26 Feb 2014 15:45:14 -0500
+Subject: [PATCH 10/13] background: fix cancellable issue
+
+If we have the following sequence:
+
+    cache.getImageContent({ filename: "foo", cancellable: cancellable1 });
+    cache.getImageContent({ filename: "foo", cancellable: cancellable2 });
+    cancellable1.cancel();
+
+Then the second load will complete with "null" as its content, even though
+it was never cancelled, and we'll see a blank image. Meanwhile, since the
+second load simply appends to the list of callers for the second load,
+cancellable2 does absolutely nothing: cancelling it won't stop the load,
+and it will still receive onFinished handling.
+
+To prevent this from happening, give the actual load operation its own
+Gio.Cancellable, which is "ref-counted" -- only cancel it when all the other
+possible callers cancel.
+
+Based on work from Jasper St. Pierre <jstpierre@macheye.net>
+
+https://bugzilla.gnome.org/show_bug.cgi?id=722149
+---
+ js/ui/background.js | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 417f70d..5d6d615 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -146,6 +146,21 @@ const BackgroundCache = new Lang.Class({
+ 
+     _attachCallerToFileLoad: function(caller, fileLoad) {
+         fileLoad.callers.push(caller);
++
++        if (!caller.cancellable)
++            return;
++
++        caller.cancellable.connect(Lang.bind(this, function() {
++            let idx = fileLoad.callers.indexOf(caller);
++            fileLoad.callers.splice(idx, 1);
++
++            if (fileLoad.callers.length == 0) {
++                fileLoad.cancellable.cancel();
++
++                let idx = this._pendingFileLoads.indexOf(fileLoad);
++                this._pendingFileLoads.splice(idx, 1);
++            }
++        }));
+     },
+ 
+     _loadImageContent: function(params) {
+@@ -158,6 +173,7 @@ const BackgroundCache = new Lang.Class({
+ 
+         let caller = { monitorIndex: params.monitorIndex,
+                        effects: params.effects,
++                       cancellable: params.cancellable,
+                        onFinished: params.onFinished };
+ 
+         for (let i = 0; i < this._pendingFileLoads.length; i++) {
+@@ -172,6 +188,7 @@ const BackgroundCache = new Lang.Class({
+ 
+         let fileLoad = { filename: params.filename,
+                          style: params.style,
++                         cancellable: new Gio.Cancellable(),
+                          callers: [] };
+         this._attachCallerToFileLoad(caller, fileLoad);
+ 
+-- 
+1.9.0
+
+
+From b9c8c220ea0cdd1f3d1b8ddefb9fc0e43d9e004f Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Tue, 3 Dec 2013 15:41:42 -0500
+Subject: [PATCH 11/13] background: Fix the check for spanning backgrounds
+
+this._monitorIndex does not exist, and neither does
+MetaBackground.monitor_index...
+
+https://bugzilla.gnome.org/show_bug.cgi?id=719803
+---
+ js/ui/background.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 5d6d615..0ac4ddc 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -247,7 +247,7 @@ const BackgroundCache = new Lang.Class({
+                 continue;
+ 
+             if (params.style == GDesktopEnums.BackgroundStyle.SPANNED &&
+-                this._images[i].monitor_index != this._monitorIndex)
++                this._images[i].monitor != params.monitorIndex)
+                 continue;
+ 
+             candidateContent = this._images[i];
+-- 
+1.9.0
+
+
+From 3466eb95898adb14a28f32740dde559b460a3ca2 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Tue, 3 Dec 2013 15:56:12 -0500
+Subject: [PATCH 12/13] background: Don't wait for gdk-pixbuf to fail before
+ loading animations
+
+We don't have any better way of determining whether something is a slideshow
+animation, so discriminate on the .xml filename instead of waiting for
+gdk-pixbuf to determine whether it can load a file or not.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=719803
+---
+ js/ui/background.js | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 0ac4ddc..0c22a0d 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -568,24 +568,25 @@ const Background = new Lang.Class({
+                                            });
+     },
+ 
+-    _loadFile: function(filename) {
++    _loadImage: function(filename) {
+         this._cache.getImageContent({ monitorIndex: this._monitorIndex,
+                                       effects: this._effects,
+                                       style: this._style,
+                                       filename: filename,
+                                       cancellable: this._cancellable,
+                                       onFinished: Lang.bind(this, function(content) {
+-                                          if (!content) {
+-                                              if (!this._cancellable.is_cancelled())
+-                                                  this._loadAnimation(filename);
+-                                              return;
+-                                          }
+-
+-                                          this._addImage(content, 0, filename);
++                                          if (content)
++                                              this._addImage(content, 0, filename);
+                                           this._setLoaded();
+                                       })
+                                     });
++    },
+ 
++    _loadFile: function(filename) {
++        if (filename.indexOf('.xml', filename.length - 4) !== -1)
++            this._loadAnimation(filename);
++        else
++            this._loadImage(filename);
+     },
+ 
+     _load: function () {
+-- 
+1.9.0
+
+
+From b44299e03981125c2877082226cc2276ad5b47bd Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Tue, 3 Dec 2013 17:25:57 -0500
+Subject: [PATCH 13/13] background: Simplify animation code
+
+https://bugzilla.gnome.org/show_bug.cgi?id=719803
+---
+ js/ui/background.js | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
+
+diff --git a/js/ui/background.js b/js/ui/background.js
+index 0c22a0d..5575815 100644
+--- a/js/ui/background.js
++++ b/js/ui/background.js
+@@ -439,29 +439,27 @@ const Background = new Lang.Class({
+         this._fileWatches[filename] = signalId;
+     },
+ 
+-    _addImage: function(content, index, filename) {
+-        content.saturation = this._saturation;
+-        content.brightness = this._brightness;
+-        content.vignette_sharpness = this._vignetteSharpness;
++    _ensureImage: function(index) {
++        if (this._images[index])
++            return;
+ 
+         let actor = new Meta.BackgroundActor();
+-        actor.content = content;
+ 
+         // The background pattern is the first actor in
+         // the group, and all images should be above that.
+         this.actor.insert_child_at_index(actor, index + 1);
+-
+         this._images[index] = actor;
+-        this._watchCacheFile(filename);
+     },
+ 
+-    _updateImage: function(content, index, filename) {
++    _updateImage: function(index, content, filename) {
+         content.saturation = this._saturation;
+         content.brightness = this._brightness;
+         content.vignette_sharpness = this._vignetteSharpness;
+ 
+-        this._cache.removeImageContent(this._images[index].content);
+-        this._images[index].content = content;
++        let image = this._images[index];
++        if (image.content)
++            this._cache.removeImageContent(content);
++        image.content = content;
+         this._watchCacheFile(filename);
+     },
+ 
+@@ -509,11 +507,8 @@ const Background = new Lang.Class({
+                                                   return;
+                                               }
+ 
+-                                              if (!this._images[i]) {
+-                                                  this._addImage(content, i, files[i]);
+-                                              } else {
+-                                                  this._updateImage(content, i, files[i]);
+-                                              }
++                                              this._ensureImage(i);
++                                              this._updateImage(i, content, files[i]);
+ 
+                                               if (numPendingImages == 0) {
+                                                   this._setLoaded();
+@@ -575,8 +570,10 @@ const Background = new Lang.Class({
+                                       filename: filename,
+                                       cancellable: this._cancellable,
+                                       onFinished: Lang.bind(this, function(content) {
+-                                          if (content)
+-                                              this._addImage(content, 0, filename);
++                                          if (content) {
++                                              this._ensureImage(0);
++                                              this._updateImage(0, content, filename);
++                                          }
+                                           this._setLoaded();
+                                       })
+                                     });
+-- 
+1.9.0
+
