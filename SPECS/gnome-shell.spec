@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.8.4
-Release:        31%{?dist}
+Release:        32%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -19,6 +19,7 @@ Patch4: gnome-shell-favourite-apps-empathy.patch
 
 Patch10: 0001-popupMenu-Fix-removing-the-active-menu-from-PopupMen.patch
 Patch11: 0001-catch-more-errors-on-extensions-enable-and-disable.patch
+Patch12: 0001-layout-Don-t-always-extend-struts-to-the-screen-edge.patch
 
 Patch20: 0001-main-allow-session-mode-to-be-specified-in-the-envir.patch
 
@@ -162,6 +163,7 @@ be used only by extensions.gnome.org.
 
 %patch10 -p1 -b .fix-popup-menu-manager-exception
 %patch11 -p1 -b .catch-extension-errors
+%patch12 -p1 -b .improve-vertical-monitor-layouts
 
 %patch20 -p1 -b .main-allow-session-mode-to-be-specified-in-the-envir
 
@@ -260,6 +262,10 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Wed Apr 16 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-32
+- Improve vertical monitor layouts
+  Resolves: rhbz#1096186
+
 * Wed Mar 19 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-31
 - Fix some more background memory leaks
   Resolves: rhbz#1027192
