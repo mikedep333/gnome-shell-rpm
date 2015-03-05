@@ -1,0 +1,69 @@
+From daf661fbffb3e4c6afd082785721f199f992eab0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 4 Jun 2014 16:26:06 +0200
+Subject: [PATCH] screenshot: Also validate parameters to FlashArea()
+
+Apply the same parameter validation to FlashArea() we already use
+for ScreenshotArea().
+
+https://bugzilla.gnome.org/show_bug.cgi?id=731220
+---
+ js/ui/screenshot.js | 26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/js/ui/screenshot.js b/js/ui/screenshot.js
+index 3c5c831..f85c62e 100644
+--- a/js/ui/screenshot.js
++++ b/js/ui/screenshot.js
+@@ -64,6 +64,13 @@ const ScreenshotService = new Lang.Class({
+         Gio.DBus.session.own_name('org.gnome.Shell.Screenshot', Gio.BusNameOwnerFlags.REPLACE, null, null);
+     },
+ 
++    _checkArea: function(x, y, width, height) {
++        return x >= 0 && y >= 0 &&
++               width > 0 && height > 0 &&
++               x + width <= global.screen_width &&
++               y + height <= global.screen_height;
++    },
++
+     _onScreenshotComplete: function(obj, result, area, filenameUsed, flash, invocation) {
+         if (flash && result) {
+             let flashspot = new Flashspot(area);
+@@ -76,11 +83,10 @@ const ScreenshotService = new Lang.Class({
+ 
+     ScreenshotAreaAsync : function (params, invocation) {
+         let [x, y, width, height, flash, filename, callback] = params;
+-        if (x < 0 || y < 0 ||
+-            width <= 0 || height <= 0 ||
+-            x + width > global.screen_width || y + height > global.screen_height) {
+-            invocation.return_error_literal(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED,
+-                        "Invalid params");
++        if (!this._checkArea(x, y, width, height)) {
++            invocation.return_error_literal(Gio.IOErrorEnum,
++                                            Gio.IOErrorEnum.CANCELLED,
++                                            "Invalid params");
+             return;
+         }
+         let screenshot = new Shell.Screenshot();
+@@ -122,9 +128,17 @@ const ScreenshotService = new Lang.Class({
+             }));
+     },
+ 
+-    FlashArea: function(x, y, width, height) {
++    FlashAreaAsync: function(params, invocation) {
++        let [x, y, width, height] = params;
++        if (!this._checkArea(x, y, width, height)) {
++            invocation.return_error_literal(Gio.IOErrorEnum,
++                                            Gio.IOErrorEnum.CANCELLED,
++                                            "Invalid params");
++            return;
++        }
+         let flashspot = new Flashspot({ x : x, y : y, width: width, height: height});
+         flashspot.fire();
++        invocation.return_value(null);
+     }
+ });
+ 
+-- 
+2.1.0
+

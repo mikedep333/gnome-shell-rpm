@@ -1,0 +1,338 @@
+From 3e707f08e1b8687abb093d020b78dc571c68df06 Mon Sep 17 00:00:00 2001
+From: "Owen W. Taylor" <otaylor@fishsoup.net>
+Date: Thu, 8 May 2014 18:56:23 -0400
+Subject: [PATCH] Add support for meta_restart() and MetaDisplay::restart
+
+Support was added to Mutter to allow it to trigger a restart
+to allow for restarts when switching in or out of stereo mode.
+
+Hook up to the new signals on MetaDisplay to show the restart
+message and reexec. Meta.is_restart() is used to suppress
+the startup animation.
+
+This also allows us to do 'Alt-F2 r' restarts more cleanly
+without a visual flash and animation.
+---
+ data/theme/gnome-shell.css |   5 ++
+ js/ui/layout.js            | 115 +++++++++++++++++++++++++++------------------
+ js/ui/main.js              |  36 ++++++++++++++
+ js/ui/modalDialog.js       |  35 ++++++++------
+ js/ui/runDialog.js         |  14 +++---
+ 5 files changed, 138 insertions(+), 67 deletions(-)
+
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index f4ea781..66346a1 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -1920,6 +1920,11 @@ StScrollBar StButton#vhandle:active {
+     color: #444444;
+ }
+ 
++/* Restart message */
++.restart-message {
++    font-size: 14pt;
++}
++
+ /* ShellMountOperation Dialogs */
+ .shell-mount-operation-icon {
+     icon-size: 48px;
+diff --git a/js/ui/layout.js b/js/ui/layout.js
+index 141eecc..223a0e2 100644
+--- a/js/ui/layout.js
++++ b/js/ui/layout.js
+@@ -560,56 +560,75 @@ const LayoutManager = new Lang.Class({
+         // so events don't get delivered to X11 windows (which are distorted by the animation)
+         global.stage_input_mode = Shell.StageInputMode.FULLSCREEN;
+ 
+-        if (Main.sessionMode.isGreeter) {
+-            this.panelBox.translation_y = -this.panelBox.height;
++        let background;
++        if (Meta.is_restart()) {
++            // On restart, we don't do an animation, so start loading the primary
++            // background now.
++            this._createPrimaryBackground();
++            background = this._bgManagers[this.primaryIndex].background;
+         } else {
+-            // We need to force an update of the regions now before we scale
+-            // the UI group to get the coorect allocation for the struts.
+-            this._updateRegions();
+-
+-            this.trayBox.hide();
+-            this.keyboardBox.hide();
+-
+-            let monitor = this.primaryMonitor;
+-            let x = monitor.x + monitor.width / 2.0;
+-            let y = monitor.y + monitor.height / 2.0;
+-
+-            this.uiGroup.set_pivot_point(x / global.screen_width,
+-                                         y / global.screen_height);
+-            this.uiGroup.scale_x = this.uiGroup.scale_y = 0.5;
+-            this.uiGroup.opacity = 0;
+-            global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
+-        }
+-
+-        this._systemBackground = new Background.SystemBackground();
+-        this._systemBackground.actor.hide();
+-
+-        global.stage.insert_child_below(this._systemBackground.actor, null);
++            if (Main.sessionMode.isGreeter) {
++                this.panelBox.translation_y = -this.panelBox.height;
++            } else {
++                // We need to force an update of the regions now before we scale
++                // the UI group to get the coorect allocation for the struts.
++                this._updateRegions();
++
++                this.trayBox.hide();
++                this.keyboardBox.hide();
++
++                let monitor = this.primaryMonitor;
++                let x = monitor.x + monitor.width / 2.0;
++                let y = monitor.y + monitor.height / 2.0;
++
++                this.uiGroup.set_pivot_point(x / global.screen_width,
++                                             y / global.screen_height);
++                this.uiGroup.scale_x = this.uiGroup.scale_y = 0.5;
++                this.uiGroup.opacity = 0;
++                global.window_group.set_clip(monitor.x, monitor.y, monitor.width, monitor.height);
++            }
+ 
+-        let constraint = new Clutter.BindConstraint({ source: global.stage,
+-                                                      coordinate: Clutter.BindCoordinate.ALL });
+-        this._systemBackground.actor.add_constraint(constraint);
++            this._systemBackground = new Background.SystemBackground();
++            this._systemBackground.actor.hide();
+ 
+-        let signalId = this._systemBackground.connect('loaded',
+-                                                      Lang.bind(this, function() {
+-                                                          this._systemBackground.disconnect(signalId);
+-                                                          this._systemBackground.actor.show();
+-                                                          global.stage.show();
++            global.stage.insert_child_below(this._systemBackground.actor, null);
+ 
+-                                                          this.emit('startup-prepared');
++            let constraint = new Clutter.BindConstraint({ source: global.stage,
++                                                          coordinate: Clutter.BindCoordinate.ALL });
++            this._systemBackground.actor.add_constraint(constraint);
++            background = this._systemBackground;
++        }
+ 
+-                                                          // We're mostly prepared for the startup animation
+-                                                          // now, but since a lot is going on asynchronously
+-                                                          // during startup, let's defer the startup animation
+-                                                          // until the event loop is uncontended and idle.
+-                                                          // This helps to prevent us from running the animation
+-                                                          // when the system is bogged down
+-                                                          GLib.idle_add(GLib.PRIORITY_LOW,
+-                                                                        Lang.bind(this, function() {
+-                                                                            this._startupAnimation();
+-                                                                            return false;
+-                                                                        }));
+-                                                      }));
++        let signalId = background.connect('loaded',
++                                          Lang.bind(this, function() {
++                                              background.disconnect(signalId);
++                                              if (this._systemBackground)
++                                                  this._systemBackground.actor.show();
++                                              global.stage.show();
++
++                                              this.emit('startup-prepared');
++
++                                              // We're mostly prepared for the startup animation
++                                              // now, but since a lot is going on asynchronously
++                                              // during startup, let's defer the startup animation
++                                              // until the event loop is uncontended and idle.
++                                              // This helps to prevent us from running the animation
++                                              // when the system is bogged down. Don't wait on
++                                              // restart, since it might take a long time for us
++                                              // to go idle, and we don't show an animation. Just
++                                              // finish immediately.
++                                              if (Meta.is_restart()) {
++                                                  // Nothing else will do this reliably
++                                                  this._queueUpdateRegions();
++                                                  this._startupAnimationComplete();
++                                              } else {
++                                                  GLib.idle_add(GLib.PRIORITY_LOW,
++                                                                Lang.bind(this, function() {
++                                                                    this._startupAnimation();
++                                                                    return false;
++                                                                }));
++                                              }
++                                          }));
+     },
+ 
+     _startupAnimation: function() {
+@@ -647,8 +666,10 @@ const LayoutManager = new Lang.Class({
+ 
+         global.stage_input_mode = Shell.StageInputMode.NORMAL;
+ 
+-        this._systemBackground.actor.destroy();
+-        this._systemBackground = null;
++        if (this._systemBackground) {
++            this._systemBackground.actor.destroy();
++            this._systemBackground = null;
++        }
+ 
+         this._startingUp = false;
+ 
+diff --git a/js/ui/main.js b/js/ui/main.js
+index bd5dc47..a3b73f0 100644
+--- a/js/ui/main.js
++++ b/js/ui/main.js
+@@ -18,6 +18,7 @@ const ExtensionSystem = imports.ui.extensionSystem;
+ const ExtensionDownloader = imports.ui.extensionDownloader;
+ const Keyboard = imports.ui.keyboard;
+ const MessageTray = imports.ui.messageTray;
++const ModalDialog = imports.ui.modalDialog;
+ const OsdWindow = imports.ui.osdWindow;
+ const Overview = imports.ui.overview;
+ const Panel = imports.ui.panel;
+@@ -176,6 +177,16 @@ function _initializeUI() {
+                                             false, -1, 1);
+     global.display.connect('overlay-key', Lang.bind(overview, overview.toggle));
+ 
++    global.display.connect('show-restart-message', function(display, message) {
++        showRestartMessage(message);
++        return true;
++    });
++
++    global.display.connect('restart', function() {
++        global.reexec_self();
++        return true;
++    });
++
+     // Provide the bus object for gnome-session to
+     // initiate logouts.
+     EndSessionDialog.init();
+@@ -800,3 +811,28 @@ function queueDeferredWork(workId) {
+         });
+     }
+ }
++
++const RestartMessage = new Lang.Class({
++    Name: 'RestartMessage',
++    Extends: ModalDialog.ModalDialog,
++
++    _init : function(message) {
++        this.parent({ shellReactive: true,
++                      styleClass: 'restart-message',
++                      shouldFadeIn: false,
++                      destroyOnClose: true });
++
++        let label = new St.Label({ text: message });
++
++        this.contentLayout.add(label, { x_fill: false,
++                                        y_fill: false,
++                                        x_align: St.Align.MIDDLE,
++                                        y_align: St.Align.MIDDLE });
++        this.buttonLayout.hide();
++    }
++});
++
++function showRestartMessage(message) {
++    let restartMessage = new RestartMessage(message);
++    restartMessage.open();
++}
+diff --git a/js/ui/modalDialog.js b/js/ui/modalDialog.js
+index f770faf..aba7758 100644
+--- a/js/ui/modalDialog.js
++++ b/js/ui/modalDialog.js
+@@ -43,6 +43,7 @@ const ModalDialog = new Lang.Class({
+                                         parentActor: Main.uiGroup,
+                                         keybindingMode: Shell.KeyBindingMode.SYSTEM_MODAL,
+                                         shouldFadeIn: true,
++                                        shouldFadeOut: true,
+                                         destroyOnClose: true });
+ 
+         this.state = State.CLOSED;
+@@ -50,6 +51,7 @@ const ModalDialog = new Lang.Class({
+         this._keybindingMode = params.keybindingMode;
+         this._shellReactive = params.shellReactive;
+         this._shouldFadeIn = params.shouldFadeIn;
++        this._shouldFadeOut = params.shouldFadeOut;
+         this._destroyOnClose = params.destroyOnClose;
+ 
+         this._group = new St.Widget({ visible: false,
+@@ -303,6 +305,15 @@ const ModalDialog = new Lang.Class({
+         return true;
+     },
+ 
++    _closeComplete: function() {
++        this.state = State.CLOSED;
++        this._group.hide();
++        this.emit('closed');
++
++        if (this._destroyOnClose)
++            this.destroy();
++    },
++
+     close: function(timestamp) {
+         if (this.state == State.CLOSED || this.state == State.CLOSING)
+             return;
+@@ -311,20 +322,16 @@ const ModalDialog = new Lang.Class({
+         this.popModal(timestamp);
+         this._savedKeyFocus = null;
+ 
+-        Tweener.addTween(this._group,
+-                         { opacity: 0,
+-                           time: OPEN_AND_CLOSE_TIME,
+-                           transition: 'easeOutQuad',
+-                           onComplete: Lang.bind(this,
+-                               function() {
+-                                   this.state = State.CLOSED;
+-                                   this._group.hide();
+-                                   this.emit('closed');
+-
+-                                   if (this._destroyOnClose)
+-                                       this.destroy();
+-                               })
+-                         });
++        if (this._shouldFadeOut)
++            Tweener.addTween(this._group,
++                             { opacity: 0,
++                               time: OPEN_AND_CLOSE_TIME,
++                               transition: 'easeOutQuad',
++                               onComplete: Lang.bind(this,
++                                                     this._closeComplete)
++                             })
++        else
++            this._closeComplete();
+     },
+ 
+     // Drop modal status without closing the dialog; this makes the
+diff --git a/js/ui/runDialog.js b/js/ui/runDialog.js
+index 7b753a7..1901296 100644
+--- a/js/ui/runDialog.js
++++ b/js/ui/runDialog.js
+@@ -50,14 +50,10 @@ const RunDialog = new Lang.Class({
+                                        Main.createLookingGlass().open();
+                                    }),
+ 
+-                                   'r': Lang.bind(this, function() {
+-                                       global.reexec_self();
+-                                   }),
++                                   'r': Lang.bind(this, this._restart),
+ 
+                                    // Developer brain backwards compatibility
+-                                   'restart': Lang.bind(this, function() {
+-                                       global.reexec_self();
+-                                   }),
++                                   'restart': Lang.bind(this, this._restart),
+ 
+                                    'debugexit': Lang.bind(this, function() {
+                                        Meta.quit(Meta.ExitCode.ERROR);
+@@ -267,6 +263,12 @@ const RunDialog = new Lang.Class({
+         }
+     },
+ 
++    _restart: function() {
++        this._shouldFadeOut = false;
++        this.close();
++        Meta.restart('Restarting...');
++    },
++
+     open: function() {
+         this._history.lastItem();
+         this._errorBox.hide();
+-- 
+1.8.3.1
+

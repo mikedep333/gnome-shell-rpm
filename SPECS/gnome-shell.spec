@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.8.4
-Release:        32%{?dist}
+Release:        45%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -19,7 +19,10 @@ Patch4: gnome-shell-favourite-apps-empathy.patch
 
 Patch10: 0001-popupMenu-Fix-removing-the-active-menu-from-PopupMen.patch
 Patch11: 0001-catch-more-errors-on-extensions-enable-and-disable.patch
-Patch12: 0001-layout-Don-t-always-extend-struts-to-the-screen-edge.patch
+Patch12: vertical-monitor-layouts.patch
+Patch13: fix-thumbail-box-shrinking.patch
+Patch14: 0001-dateMenu-Try-to-use-the-default-calendar-application.patch
+Patch15: 0001-appSwitcher-Add-option-to-limit-to-the-current-works.patch
 
 Patch20: 0001-main-allow-session-mode-to-be-specified-in-the-envir.patch
 
@@ -38,6 +41,9 @@ Patch63: 0002-keyring-Cancel-active-prompts-on-disable.patch
 Patch70: 0001-screenshot-Extend-ScreenshotArea-parameter-validatio.patch
 Patch71: 0002-screencast-Fix-disabling-screencasts-via-session-mod.patch
 Patch72: 0003-screencast-Validate-parameters-of-ScreencastArea.patch
+Patch73: 0001-screenshot-Also-validate-parameters-to-FlashArea.patch
+Patch74: 0001-shell-screenshot-Only-allow-one-screenshot-request-a.patch
+Patch75: respect-disk-writes-lockdown-setting.patch
 
 Patch80: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
 Patch81: 0002-extensions-Add-a-SESSION_MODE-extension-type.patch
@@ -47,12 +53,19 @@ Patch90: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
 Patch99: login-screen-backport.patch
 Patch100: gdm-support-pre-authenticated-logins-from-oVirt.patch
 Patch101: dont-load-user-list-when-disabled.patch
+Patch102: disallow-cancel-after-success.patch
+Patch103: fix-login-screen-focus.patch
+Patch104: fix-cancel-sensitivity.patch
+Patch105: login-banner-fixes.patch
+Patch106: fix-session-activation.patch
+
+Patch110: 0001-Add-support-for-meta_restart-and-MetaDisplay-restart.patch
 
 %define clutter_version 1.13.4
 %define gnome_bluetooth_version 3.5.5
 %define gobject_introspection_version 0.10.1
 %define gjs_version 1.35.4
-%define mutter_version 3.8.3
+%define mutter_version 3.8.4-12
 %define eds_version 3.5.3
 %define gnome_desktop_version 3.7.90
 %define gnome_menus_version 3.5.3
@@ -164,6 +177,9 @@ be used only by extensions.gnome.org.
 %patch10 -p1 -b .fix-popup-menu-manager-exception
 %patch11 -p1 -b .catch-extension-errors
 %patch12 -p1 -b .improve-vertical-monitor-layouts
+%patch13 -p1 -b .fix-shrinking-workspace-switcher
+%patch14 -p1 -b .use-default-calendar-app
+%patch15 -p1 -b .current-workspace-app-switcher-option
 
 %patch20 -p1 -b .main-allow-session-mode-to-be-specified-in-the-envir
 
@@ -182,6 +198,9 @@ be used only by extensions.gnome.org.
 %patch70 -p1 -b .validate-screenshot-params
 %patch71 -p1 -b .fix-disable-screencasts
 %patch72 -p1 -b .validate-screencast-params
+%patch73 -p1 -b .validate-screenshot-params
+%patch74 -p1 -b .disallow-consecutive-screenshots
+%patch75 -p1 -b .respect-disk-writes-lockdown
 
 %patch80 -p1
 %patch81 -p1
@@ -191,6 +210,13 @@ be used only by extensions.gnome.org.
 %patch99 -p1 -b .login-screen-backport
 %patch100 -p1 -b .gdm-support-pre-authenticated-logins-from-oVirt
 %patch101 -p1 -b .dont-load-user-list-when-disabled
+%patch102 -p1 -b .disallow-cancel-after-success
+%patch103 -p1 -b .fix-login-screen-focus
+%patch104 -p1 -b .fix-cancel-sensitivity
+%patch105 -p1 -b .login-banner-fixes
+%patch106 -p1 -b .fix-session-activation
+
+%patch110 -p1 -b .meta-restart
 
 %build
 autoreconf -f
@@ -262,9 +288,82 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
-* Wed Apr 16 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-32
+* Thu Nov 13 2014 Ray Strode <rstrode@redhat.com> 3.8.4-45
+- Don't inform GDM about session changes that came from GDM
+  Resolves: #1163474
+
+* Wed Nov 12 2014 Ray Strode <rstrode@redhat.com> 3.8.4-44
+- If password authentication is disabled and smartcard authentication is
+  enabled and smartcard isn't plugged in at start up, prompt user for
+  smartcard
+  Resolves: #1159385
+
+* Wed Nov 12 2014 Ray Strode <rstrode@redhat.com> - 3.8.4-43
+- Support long login banner messages more effectively
+  Resolves: #1110036
+
+* Fri Oct 17 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-42
+- Respect disk-writes lockdown setting
+  Resolves: rhbz#1154122
+
+* Sat Oct 11 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-41
+- Disallow consecutive screenshot requests to avoid an OOM situation
+  Resolves: rhbz#1154107
+
+* Fri Oct 10 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-41
+- Add option to limit app switcher to current workspace
+  Resolves: rhbz#1101568
+
+* Fri Oct 10 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-40
+- Try harder to use the default calendar application
+  Resolves: rhbz#1052201
+
+* Fri Oct 10 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-40
+- Update workspace switcher fix
+  Resolves: rhbz#1092102
+
+* Thu Oct 09 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-39
+- Validate screenshot parameters
+  Resolves: rhbz#1104694
+
+* Thu Oct 09 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-38
+- Fix shrinking workspace switcher
+  Resolves: rhbz#1092102
+
+* Thu Oct 09 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-38
+- Update fix for vertical monitor layouts to upstream fix
+  Resolves: rhbz#1075240
+
+* Wed Oct 08 2014 Ray Strode <rstrode@redhat.com> 3.8.4-38
+- Fix traceback introduced in 3.8.4-36 when unlocking via
+  user switcher
+  Related: #1101333
+
+* Tue Oct 07 2014 Ray Strode <rstrode@redhat.com> 3.8.4-37
+- Fix problems with LDAP and disable-user-list=TRUE
+  Resolves: rhbz#1137041
+
+* Mon Oct 06 2014 Ray Strode <rstrode@redhat.com> 3.8.4-36
+- Fix login screen focus issue following idle
+  Resolves: rhbz#1101333
+
+* Sun Oct 05 2014 Ray Strode <rstrode@redhat.com> 3.8.4-35
+- Disallow cancel from login screen before login attempt
+  has been initiated.
+  Resolves: rhbz#1109530
+
+* Sun Oct 05 2014 Ray Strode <rstrode@redhat.com> 3.8.4-34
+- Disallow cancel from login screen after login is already
+  commencing.
+  Resolves: rhbz#1079294
+
+* Thu Jul 17 2014 Owen Taylor <otaylor@redhat.com> 3.8.4-33
+- Add a patch for quadbuffer stereo suppport
+  Resolves: rhbz#1108893
+
+* Wed Apr 16 2014 Florian Müllner <fmuellner@redhat.com> - 3.13.4-32
 - Improve vertical monitor layouts
-  Resolves: rhbz#1096186
+  Resolves: rhbz#1075240
 
 * Wed Mar 19 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-31
 - Fix some more background memory leaks

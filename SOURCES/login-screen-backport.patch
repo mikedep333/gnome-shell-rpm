@@ -12907,7 +12907,7 @@ index a7b8b62..7ed5097 100644
      _updateDefaultService: function() {
          if (this._settings.get_boolean(PASSWORD_AUTHENTICATION_KEY))
              this._defaultService = PASSWORD_SERVICE_NAME;
-+        else if (this.smartcardDetected)
++        else if (this._settings.get_boolean(SMARTCARD_AUTHENTICATION_KEY))
 +            this._defaultService = SMARTCARD_SERVICE_NAME;
          else if (this._haveFingerprintReader)
              this._defaultService = FINGERPRINT_SERVICE_NAME;
@@ -15070,7 +15070,7 @@ index 887bedb..26028c8 100644
          // Translators: this message is shown below the username entry field
          // to clue the user in on how to login to the local network realm
 -        this._authPrompt.setHint(_("(e.g., user or %s)").format(hint));
-+        this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), AuthPrompt.MessageType.HINT);
++        this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), GdmUtil.MessageType.HINT);
      },
  
      _askForUsernameAndBeginVerification: function() {
@@ -15683,7 +15683,7 @@ index bfbd1b3..f421902 100644
      _updateDefaultService: function() {
          if (this._settings.get_boolean(PASSWORD_AUTHENTICATION_KEY))
              this._defaultService = PASSWORD_SERVICE_NAME;
-         else if (this.smartcardDetected)
+         else if (this._settings.get_boolean(SMARTCARD_AUTHENTICATION_KEY))
              this._defaultService = SMARTCARD_SERVICE_NAME;
          else if (this._haveFingerprintReader)
              this._defaultService = FINGERPRINT_SERVICE_NAME;
@@ -15875,7 +15875,7 @@ index 26028c8..315a863 100644
  
          // Translators: this message is shown below the username entry field
          // to clue the user in on how to login to the local network realm
-         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), AuthPrompt.MessageType.HINT);
+         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), GdmUtil.MessageType.HINT);
      },
  
      _askForUsernameAndBeginVerification: function() {
@@ -17181,7 +17181,7 @@ index 1649e4e..9d5e243 100644
  
          // Translators: this message is shown below the username entry field
          // to clue the user in on how to login to the local network realm
-         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), AuthPrompt.MessageType.HINT);
+         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), GdmUtil.MessageType.HINT);
 -- 
 1.8.3.1
 
@@ -18158,7 +18158,7 @@ index ca2b060..ee0199c 100644
  
          // Translators: this message is shown below the username entry field
          // to clue the user in on how to login to the local network realm
-         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), AuthPrompt.MessageType.HINT);
+         this._authPrompt.setMessage(_("(e.g., user or %s)").format(hint), GdmUtil.MessageType.HINT);
      },
  
      _askForUsernameAndBeginVerification: function() {

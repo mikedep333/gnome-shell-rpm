@@ -1,0 +1,676 @@
+From 2446c4bdb9bcea36234108303c7bf33b3d238fa3 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Mon, 25 Feb 2013 18:05:45 -0500
+Subject: [PATCH 1/8] overview: Move the group construction to the controls
+ manager
+
+Instead of creating a bunch of random actors and then passing
+them off to the controls manager, let the controls manager
+construct them. This leaves the controls manager in charge
+of the ordeal.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694469
+---
+ js/ui/overview.js         | 37 ++++--------------------------
+ js/ui/overviewControls.js | 58 ++++++++++++++++++++++++++++++++---------------
+ 2 files changed, 45 insertions(+), 50 deletions(-)
+
+diff --git a/js/ui/overview.js b/js/ui/overview.js
+index 02b23c7..ab4845c 100644
+--- a/js/ui/overview.js
++++ b/js/ui/overview.js
+@@ -11,7 +11,6 @@ const Shell = imports.gi.Shell;
+ const Gdk = imports.gi.Gdk;
+ 
+ const Background = imports.ui.background;
+-const Dash = imports.ui.dash;
+ const DND = imports.ui.dnd;
+ const LayoutManager = imports.ui.layout;
+ const Main = imports.ui.main;
+@@ -20,8 +19,6 @@ const OverviewControls = imports.ui.overviewControls;
+ const Panel = imports.ui.panel;
+ const Params = imports.misc.params;
+ const Tweener = imports.ui.tweener;
+-const ViewSelector = imports.ui.viewSelector;
+-const WorkspaceThumbnail = imports.ui.workspaceThumbnail;
+ 
+ // Time for initial animation going into Overview mode
+ const ANIMATION_TIME = 0.25;
+@@ -133,14 +130,6 @@ const Overview = new Lang.Class({
+                                             y_expand: true });
+         this._overview._delegate = this;
+ 
+-        this._groupStack = new St.Widget({ layout_manager: new Clutter.BinLayout(),
+-                                           x_expand: true, y_expand: true,
+-                                           clip_to_allocation: true });
+-        this._group = new St.BoxLayout({ name: 'overview-group',
+-                                         reactive: true,
+-                                         x_expand: true, y_expand: true });
+-        this._groupStack.add_actor(this._group);
+-
+         this._backgroundGroup = new Meta.BackgroundGroup();
+         global.overlay_group.add_child(this._backgroundGroup);
+         this._backgroundGroup.hide();
+@@ -177,7 +166,6 @@ const Overview = new Lang.Class({
+         Main.xdndHandler.connect('drag-end', Lang.bind(this, this._onDragEnd));
+ 
+         global.screen.connect('restacked', Lang.bind(this, this._onRestacked));
+-        this._group.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
+ 
+         this._windowSwitchTimeoutId = 0;
+         this._windowSwitchTimestamp = 0;
+@@ -276,28 +264,13 @@ const Overview = new Lang.Class({
+         this._overview.add_actor(this._searchEntryBin);
+ 
+         // Create controls
+-        this._dash = new Dash.Dash();
+-        this._viewSelector = new ViewSelector.ViewSelector(this._searchEntry,
+-                                                           this._dash.showAppsButton);
+-        this._thumbnailsBox = new WorkspaceThumbnail.ThumbnailsBox();
+-        this._controls = new OverviewControls.ControlsManager(this._dash,
+-                                                              this._thumbnailsBox,
+-                                                              this._viewSelector);
+-
+-        this._controls.dashActor.x_align = Clutter.ActorAlign.START;
+-        this._controls.dashActor.y_expand = true;
+-
+-        // Put the dash in a separate layer to allow content to be centered
+-        this._groupStack.add_actor(this._controls.dashActor);
+-
+-        // Pack all the actors into the group
+-        this._group.add_actor(this._controls.dashSpacer);
+-        this._group.add(this._viewSelector.actor, { x_fill: true,
+-                                                    expand: true });
+-        this._group.add_actor(this._controls.thumbnailsActor);
++        this._controls = new OverviewControls.ControlsManager(this._searchEntry);
++        this._dash = this._controls.dash;
++        this._viewSelector = this._controls.viewSelector;
+ 
+         // Add our same-line elements after the search entry
+-        this._overview.add(this._groupStack, { y_fill: true, expand: true });
++        this._overview.add(this._controls.actor, { y_fill: true, expand: true });
++        this._controls.actor.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
+ 
+         this._stack.add_actor(this._controls.indicatorActor);
+ 
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index ba5c7a8..b3eb5d3 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -6,10 +6,12 @@ const Meta = imports.gi.Meta;
+ const St = imports.gi.St;
+ const Shell = imports.gi.Shell;
+ 
++const Dash = imports.ui.dash;
+ const Main = imports.ui.main;
+ const Params = imports.misc.params;
+ const Tweener = imports.ui.tweener;
+ const ViewSelector = imports.ui.viewSelector;
++const WorkspaceThumbnail = imports.ui.workspaceThumbnail;
+ 
+ const SIDE_CONTROLS_ANIMATION_TIME = 0.16;
+ 
+@@ -309,6 +311,10 @@ const DashSlider = new Lang.Class({
+         // available allocation
+         this._dash.actor.x_expand = true;
+         this._dash.actor.y_expand = true;
++
++        this.actor.x_align = Clutter.ActorAlign.START;
++        this.actor.y_expand = true;
++
+         this.actor.add_actor(this._dash.actor);
+ 
+         this._dash.connect('icon-size-changed', Lang.bind(this, this.updateSlide));
+@@ -479,36 +485,52 @@ const MessagesIndicator = new Lang.Class({
+ const ControlsManager = new Lang.Class({
+     Name: 'ControlsManager',
+ 
+-    _init: function(dash, thumbnails, viewSelector) {
+-        this._dashSlider = new DashSlider(dash);
+-        this.dashActor = this._dashSlider.actor;
+-        this.dashSpacer = new DashSpacer();
+-        this.dashSpacer.setDashActor(this.dashActor);
++    _init: function(searchEntry) {
++        this.dash = new Dash.Dash();
++        this._dashSlider = new DashSlider(this.dash);
++        this._dashSpacer = new DashSpacer();
++        this._dashSpacer.setDashActor(this._dashSlider.actor);
++
++        this._thumbnailsBox = new WorkspaceThumbnail.ThumbnailsBox();
++        this._thumbnailsSlider = new ThumbnailsSlider(this._thumbnailsBox);
+ 
+-        this._thumbnailsSlider = new ThumbnailsSlider(thumbnails);
+-        this.thumbnailsActor = this._thumbnailsSlider.actor;
++        this.viewSelector = new ViewSelector.ViewSelector(searchEntry,
++                                                          this.dash.showAppsButton);
++        this.viewSelector.connect('page-changed', Lang.bind(this, this._setVisibility));
++        this.viewSelector.connect('page-empty', Lang.bind(this, this._onPageEmpty));
+ 
+-        this._indicator = new MessagesIndicator(viewSelector);
++        this._indicator = new MessagesIndicator(this.viewSelector);
+         this.indicatorActor = this._indicator.actor;
+ 
+-        this._viewSelector = viewSelector;
+-        this._viewSelector.connect('page-changed', Lang.bind(this, this._setVisibility));
+-        this._viewSelector.connect('page-empty', Lang.bind(this, this._onPageEmpty));
++        this.actor = new St.Widget({ layout_manager: new Clutter.BinLayout(),
++                                     x_expand: true, y_expand: true,
++                                     clip_to_allocation: true });
++        this._group = new St.BoxLayout({ name: 'overview-group',
++                                        reactive: true,
++                                        x_expand: true, y_expand: true });
++        this.actor.add_actor(this._group);
++
++        this.actor.add_actor(this._dashSlider.actor);
++
++        this._group.add_actor(this._dashSpacer);
++        this._group.add(this.viewSelector.actor, { x_fill: true,
++                                                   expand: true });
++        this._group.add_actor(this._thumbnailsSlider.actor);
+ 
+         Main.overview.connect('showing', Lang.bind(this, this._updateSpacerVisibility));
+         Main.overview.connect('item-drag-begin', Lang.bind(this,
+             function() {
+-                let activePage = this._viewSelector.getActivePage();
++                let activePage = this.viewSelector.getActivePage();
+                 if (activePage != ViewSelector.ViewPage.WINDOWS)
+-                    this._viewSelector.fadeHalf();
++                    this.viewSelector.fadeHalf();
+             }));
+         Main.overview.connect('item-drag-end', Lang.bind(this,
+             function() {
+-                this._viewSelector.fadeIn();
++                this.viewSelector.fadeIn();
+             }));
+         Main.overview.connect('item-drag-cancelled', Lang.bind(this,
+             function() {
+-                this._viewSelector.fadeIn();
++                this.viewSelector.fadeIn();
+             }));
+     },
+ 
+@@ -521,7 +543,7 @@ const ControlsManager = new Lang.Class({
+             (Main.overview.animationInProgress && !Main.overview.visibleTarget))
+             return;
+ 
+-        let activePage = this._viewSelector.getActivePage();
++        let activePage = this.viewSelector.getActivePage();
+         let dashVisible = (activePage == ViewSelector.ViewPage.WINDOWS ||
+                            activePage == ViewSelector.ViewPage.APPS);
+         let thumbnailsVisible = (activePage == ViewSelector.ViewPage.WINDOWS);
+@@ -541,8 +563,8 @@ const ControlsManager = new Lang.Class({
+         if (Main.overview.animationInProgress && !Main.overview.visibleTarget)
+             return;
+ 
+-        let activePage = this._viewSelector.getActivePage();
+-        this.dashSpacer.visible = (activePage == ViewSelector.ViewPage.WINDOWS);
++        let activePage = this.viewSelector.getActivePage();
++        this._dashSpacer.visible = (activePage == ViewSelector.ViewPage.WINDOWS);
+     },
+ 
+     _onPageEmpty: function() {
+-- 
+2.1.0
+
+
+From 83330f59c82da874ef381ad81e79c7796bb228d1 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Wed, 18 Sep 2013 19:42:41 -0400
+Subject: [PATCH 2/8] overviewControls: Correct the use of x2 in SlidingControl
+
+The x2 here needs to be more than just the width; it needs to
+be added onto the x1.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694881
+---
+ js/ui/overviewControls.js | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index b3eb5d3..2b8977d 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -62,10 +62,11 @@ const SlideLayout = new Lang.Class({
+         let translationX = (realDirection == SlideDirection.LEFT) ?
+             (availWidth - natWidth) : (natWidth - availWidth);
+ 
+-        let actorBox = new Clutter.ActorBox({ x1: translationX,
+-                                              y1: 0,
+-                                              x2: child.x_expand ? availWidth : natWidth,
+-                                              y2: child.y_expand ? availHeight : natHeight });
++        let actorBox = new Clutter.ActorBox();
++        actorBox.x1 = translationX;
++        actorBox.x2 = actorBox.x1 + child.x_expand ? availWidth : natWidth;
++        actorBox.y1 = 0;
++        actorBox.y2 = actorBox.y1 + child.y_expand ? availHeight : natHeight;
+ 
+         child.allocate(actorBox, flags);
+     },
+-- 
+2.1.0
+
+
+From d603fda86689db852ff204048a57805bcded5f1b Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Wed, 18 Sep 2013 19:48:22 -0400
+Subject: [PATCH 3/8] overviewControls: Clarify some code with a comment
+
+translationX is sort of a bad name, since it confuses with the
+actor's translation, which is used for sliding without allocation.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694881
+---
+ js/ui/overviewControls.js | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index 2b8977d..50a7f8b 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -58,12 +58,14 @@ const SlideLayout = new Lang.Class({
+         let availWidth = Math.round(box.x2 - box.x1);
+         let availHeight = Math.round(box.y2 - box.y1);
+ 
++        // Align the actor inside the clipped box, as the actor's alignment
++        // flags only determine what to do if the allocated box is bigger
++        // than the actor's box.
+         let realDirection = getRtlSlideDirection(this._direction, child);
+-        let translationX = (realDirection == SlideDirection.LEFT) ?
+-            (availWidth - natWidth) : (natWidth - availWidth);
++        let alignX = (realDirection == SlideDirection.LEFT) ? (availWidth - natWidth) : (natWidth - availWidth);
+ 
+         let actorBox = new Clutter.ActorBox();
+-        actorBox.x1 = translationX;
++        actorBox.x1 = alignX;
+         actorBox.x2 = actorBox.x1 + child.x_expand ? availWidth : natWidth;
+         actorBox.y1 = 0;
+         actorBox.y2 = actorBox.y1 + child.y_expand ? availHeight : natHeight;
+-- 
+2.1.0
+
+
+From b311522ecc172e1ca7f46cf46492b6fd7f847e23 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Wed, 18 Sep 2013 19:48:51 -0400
+Subject: [PATCH 4/8] overviewControls: Don't try to align something sliding to
+ the right
+
+0 is already the correct value.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694881
+---
+ js/ui/overviewControls.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index 50a7f8b..0841715 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -62,7 +62,7 @@ const SlideLayout = new Lang.Class({
+         // flags only determine what to do if the allocated box is bigger
+         // than the actor's box.
+         let realDirection = getRtlSlideDirection(this._direction, child);
+-        let alignX = (realDirection == SlideDirection.LEFT) ? (availWidth - natWidth) : (natWidth - availWidth);
++        let alignX = (realDirection == SlideDirection.LEFT) ? (availWidth - natWidth) : 0;
+ 
+         let actorBox = new Clutter.ActorBox();
+         actorBox.x1 = alignX;
+-- 
+2.1.0
+
+
+From 38a92b4a0dc60f475c30e00ae9987e1e320950d0 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Fri, 11 Oct 2013 22:36:49 -0400
+Subject: [PATCH 5/8] overviewControls: Don't use the child's preferred size to
+ slide from
+
+In order for the workspace thumbnails box to have the correct size,
+we need to constrain the width of the thumbnails box to the height we're
+given, instead of assuming an unlimited height.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694881
+---
+ js/ui/overviewControls.js | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index 0841715..aafb905 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -54,9 +54,9 @@ const SlideLayout = new Lang.Class({
+     vfunc_allocate: function(container, box, flags) {
+         let child = container.get_first_child();
+ 
+-        let [, , natWidth, natHeight] = child.get_preferred_size();
+         let availWidth = Math.round(box.x2 - box.x1);
+         let availHeight = Math.round(box.y2 - box.y1);
++        let [, natWidth] = child.get_preferred_width(availHeight);
+ 
+         // Align the actor inside the clipped box, as the actor's alignment
+         // flags only determine what to do if the allocated box is bigger
+@@ -68,7 +68,7 @@ const SlideLayout = new Lang.Class({
+         actorBox.x1 = alignX;
+         actorBox.x2 = actorBox.x1 + child.x_expand ? availWidth : natWidth;
+         actorBox.y1 = 0;
+-        actorBox.y2 = actorBox.y1 + child.y_expand ? availHeight : natHeight;
++        actorBox.y2 = actorBox.y1 + availHeight;
+ 
+         child.allocate(actorBox, flags);
+     },
+@@ -237,11 +237,6 @@ const ThumbnailsSlider = new Lang.Class({
+ 
+         this._thumbnailsBox = thumbnailsBox;
+ 
+-        // SlideLayout reads the actor's expand flags to decide
+-        // whether to allocate the natural size to its child, or the whole
+-        // available allocation
+-        this._thumbnailsBox.actor.y_expand = true;
+-
+         this.actor.request_mode = Clutter.RequestMode.WIDTH_FOR_HEIGHT;
+         this.actor.reactive = true;
+         this.actor.track_hover = true;
+@@ -313,7 +308,6 @@ const DashSlider = new Lang.Class({
+         // whether to allocate the natural size to its child, or the whole
+         // available allocation
+         this._dash.actor.x_expand = true;
+-        this._dash.actor.y_expand = true;
+ 
+         this.actor.x_align = Clutter.ActorAlign.START;
+         this.actor.y_expand = true;
+-- 
+2.1.0
+
+
+From 9bc20a14840beaa4c308a11000e2a6b737f5c208 Mon Sep 17 00:00:00 2001
+From: "Jasper St. Pierre" <jstpierre@mecheye.net>
+Date: Fri, 11 Oct 2013 21:27:59 -0400
+Subject: [PATCH 6/8] workspaceThumbnail: Drop the _background hack
+
+The _background hack was added because the old way the zooming animation
+worked, it set the allocation of the workspaces view and thumbnails box
+to the final position and used animations to smoothly animate.
+
+During the 3.6 cycle when we added the new search view, Cosimo changed the
+way the zoom animation works so that rather than set the final allocation
+and animate, we actually do adjust the allocation of the workspaces view
+and thumbnails box.
+
+So, as the hack is no longer necessary, we can drop it.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=694881
+---
+ data/theme/gnome-shell.css  | 11 +++----
+ js/ui/workspaceThumbnail.js | 77 +++++++++++++--------------------------------
+ 2 files changed, 25 insertions(+), 63 deletions(-)
+
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index 532c8a5..80c929e 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -673,7 +673,9 @@ StScrollBar StButton#vhandle:active {
+     padding-bottom: 32px;
+ }
+ 
+-.workspace-thumbnails-background {
++.workspace-thumbnails {
++    spacing: 11px;
++    visible-width: 32px; /* Amount visible before hovering */
+     border: 1px solid rgba(128, 128, 128, 0.4);
+     border-right: 0px;
+     border-radius: 9px 0px 0px 9px;
+@@ -681,18 +683,13 @@ StScrollBar StButton#vhandle:active {
+     padding: 11px 7px 11px 11px;
+ }
+ 
+-.workspace-thumbnails-background:rtl {
++.workspace-thumbnails:rtl {
+     border-right: 1px;
+     border-left: 0px;
+     border-radius: 0px 9px 9px 0px;
+     padding: 11px 11px 11px 7px;
+ }
+ 
+-.workspace-thumbnails {
+-    spacing: 11px;
+-    visible-width: 32px; /* Amount visible before hovering */
+-}
+-
+ .workspace-thumbnail-indicator {
+     border: 4px solid rgba(255,255,255,0.7);
+     border-radius: 4px;
+diff --git a/js/ui/workspaceThumbnail.js b/js/ui/workspaceThumbnail.js
+index 6b631d1..d4374f2 100644
+--- a/js/ui/workspaceThumbnail.js
++++ b/js/ui/workspaceThumbnail.js
+@@ -536,20 +536,6 @@ const ThumbnailsBox = new Lang.Class({
+         this.actor.connect('allocate', Lang.bind(this, this._allocate));
+         this.actor._delegate = this;
+ 
+-        // When we animate the scale, we don't animate the requested size of the thumbnails, rather
+-        // we ask for our final size and then animate within that size. This slightly simplifies the
+-        // interaction with the main workspace windows (instead of constantly reallocating them
+-        // to a new size, they get a new size once, then use the standard window animation code
+-        // allocate the windows to their new positions), however it causes problems for drawing
+-        // the background and border wrapped around the thumbnail as we animate - we can't just pack
+-        // the container into a box and set style properties on the box since that box would wrap
+-        // around the final size not the animating size. So instead we fake the background with
+-        // an actor underneath the content and adjust the allocation of our children to leave space
+-        // for the border and padding of the background actor.
+-        this._background = new St.Bin({ style_class: 'workspace-thumbnails-background' });
+-
+-        this.actor.add_actor(this._background);
+-
+         let indicator = new St.Bin({ style_class: 'workspace-thumbnail-indicator' });
+ 
+         // We don't want the indicator to affect drag-and-drop
+@@ -1038,9 +1024,6 @@ const ThumbnailsBox = new Lang.Class({
+     },
+ 
+     _getPreferredHeight: function(actor, forWidth, alloc) {
+-        // See comment about this._background in _init()
+-        let themeNode = this._background.get_theme_node();
+-
+         // Note that for getPreferredWidth/Height we cheat a bit and skip propagating
+         // the size request to our children because we know how big they are and know
+         // that the actors aren't depending on the virtual functions being called.
+@@ -1048,24 +1031,21 @@ const ThumbnailsBox = new Lang.Class({
+         if (this._thumbnails.length == 0)
+             return;
+ 
+-        let spacing = this.actor.get_theme_node().get_length('spacing');
++        let themeNode = this.actor.get_theme_node();
++
++        let spacing = themeNode.get_length('spacing');
+         let nWorkspaces = global.screen.n_workspaces;
+         let totalSpacing = (nWorkspaces - 1) * spacing;
+ 
+-        [alloc.min_size, alloc.natural_size] =
+-            themeNode.adjust_preferred_height(totalSpacing,
+-                                              totalSpacing + nWorkspaces * this._porthole.height * MAX_THUMBNAIL_SCALE);
++        alloc.min_size = totalSpacing;
++        alloc.natural_size = totalSpacing + nWorkspaces * this._porthole.height * MAX_THUMBNAIL_SCALE;
+     },
+ 
+     _getPreferredWidth: function(actor, forHeight, alloc) {
+-        // See comment about this._background in _init()
+-        let themeNode = this._background.get_theme_node();
+-
+         if (this._thumbnails.length == 0)
+             return;
+ 
+-        // We don't animate our preferred width, which is always reported according
+-        // to the actual number of current workspaces, we just animate within that
++        let themeNode = this.actor.get_theme_node();
+ 
+         let spacing = this.actor.get_theme_node().get_length('spacing');
+         let nWorkspaces = global.screen.n_workspaces;
+@@ -1077,28 +1057,26 @@ const ThumbnailsBox = new Lang.Class({
+         scale = Math.min(scale, MAX_THUMBNAIL_SCALE);
+ 
+         let width = Math.round(this._porthole.width * scale);
+-        [alloc.min_size, alloc.natural_size] =
+-            themeNode.adjust_preferred_width(width, width);
++        alloc.min_size = width;
++        alloc.natural_size = width;
+     },
+ 
+     _allocate: function(actor, box, flags) {
+         let rtl = (Clutter.get_default_text_direction () == Clutter.TextDirection.RTL);
+ 
+-        // See comment about this._background in _init()
+-        let themeNode = this._background.get_theme_node();
+-        let contentBox = themeNode.get_content_box(box);
+-
+         if (this._thumbnails.length == 0) // not visible
+             return;
+ 
++        let themeNode = this.actor.get_theme_node();
++
+         let portholeWidth = this._porthole.width;
+         let portholeHeight = this._porthole.height;
+-        let spacing = this.actor.get_theme_node().get_length('spacing');
++        let spacing = themeNode.get_length('spacing');
+ 
+         // Compute the scale we'll need once everything is updated
+         let nWorkspaces = global.screen.n_workspaces;
+         let totalSpacing = (nWorkspaces - 1) * spacing;
+-        let avail = (contentBox.y2 - contentBox.y1) - totalSpacing;
++        let avail = (box.y2 - box.y1) - totalSpacing;
+ 
+         let newScale = (avail / nWorkspaces) / portholeHeight;
+         newScale = Math.min(newScale, MAX_THUMBNAIL_SCALE);
+@@ -1127,21 +1105,6 @@ const ThumbnailsBox = new Lang.Class({
+         else
+             slideOffset = thumbnailWidth + themeNode.get_padding(St.Side.RIGHT);
+ 
+-        let childBox = new Clutter.ActorBox();
+-
+-        // The background is horizontally restricted to correspond to the current thumbnail size
+-        // but otherwise covers the entire allocation
+-        if (rtl) {
+-            childBox.x1 = box.x1;
+-            childBox.x2 = box.x2 - ((contentBox.x2 - contentBox.x1) - thumbnailWidth);
+-        } else {
+-            childBox.x1 = box.x1 + ((contentBox.x2 - contentBox.x1) - thumbnailWidth);
+-            childBox.x2 = box.x2;
+-        }
+-        childBox.y1 = box.y1;
+-        childBox.y2 = box.y2;
+-        this._background.allocate(childBox, flags);
+-
+         let indicatorY1 = this._indicatorY;
+         let indicatorY2;
+         // when not animating, the workspace position overrides this._indicatorY
+@@ -1153,7 +1116,7 @@ const ThumbnailsBox = new Lang.Class({
+         let indicatorLeftFullBorder = indicatorThemeNode.get_padding(St.Side.LEFT) + indicatorThemeNode.get_border_width(St.Side.LEFT);
+         let indicatorRightFullBorder = indicatorThemeNode.get_padding(St.Side.RIGHT) + indicatorThemeNode.get_border_width(St.Side.RIGHT);
+ 
+-        let y = contentBox.y1;
++        let y = box.y1;
+ 
+         if (this._dropPlaceholderPos == -1) {
+             Meta.later_add(Meta.LaterType.BEFORE_REDRAW, Lang.bind(this, function() {
+@@ -1161,6 +1124,8 @@ const ThumbnailsBox = new Lang.Class({
+             }));
+         }
+ 
++        let childBox = new Clutter.ActorBox();
++
+         for (let i = 0; i < this._thumbnails.length; i++) {
+             let thumbnail = this._thumbnails[i];
+ 
+@@ -1169,10 +1134,10 @@ const ThumbnailsBox = new Lang.Class({
+ 
+             let x1, x2;
+             if (rtl) {
+-                x1 = contentBox.x1 + slideOffset * thumbnail.slidePosition;
++                x1 = box.x1 + slideOffset * thumbnail.slidePosition;
+                 x2 = x1 + thumbnailWidth;
+             } else {
+-                x1 = contentBox.x2 - thumbnailWidth + slideOffset * thumbnail.slidePosition;
++                x1 = box.x2 - thumbnailWidth + slideOffset * thumbnail.slidePosition;
+                 x2 = x1 + thumbnailWidth;
+             }
+ 
+@@ -1219,11 +1184,11 @@ const ThumbnailsBox = new Lang.Class({
+         }
+ 
+         if (rtl) {
+-            childBox.x1 = contentBox.x1;
+-            childBox.x2 = contentBox.x1 + thumbnailWidth;
++            childBox.x1 = box.x1;
++            childBox.x2 = box.x1 + thumbnailWidth;
+         } else {
+-            childBox.x1 = contentBox.x2 - thumbnailWidth;
+-            childBox.x2 = contentBox.x2;
++            childBox.x1 = box.x2 - thumbnailWidth;
++            childBox.x2 = box.x2;
+         }
+         childBox.x1 -= indicatorLeftFullBorder;
+         childBox.x2 += indicatorRightFullBorder;
+-- 
+2.1.0
+
+
+From a391e6dd3ed64517fefeaf5876fa5c838e1eb58f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 9 Oct 2014 14:07:22 +0200
+Subject: [PATCH 7/8] overviewControls: Fix thinko in SlideLayout
+
+Controls that slide left are located on the left, so the offset to
+align them with the corresponding edge is always 0. It's controls
+on the right that need a different offset when the available width
+exceeds the child's width.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=728899
+---
+ js/ui/overviewControls.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index aafb905..1d1c550 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -62,7 +62,7 @@ const SlideLayout = new Lang.Class({
+         // flags only determine what to do if the allocated box is bigger
+         // than the actor's box.
+         let realDirection = getRtlSlideDirection(this._direction, child);
+-        let alignX = (realDirection == SlideDirection.LEFT) ? (availWidth - natWidth) : 0;
++        let alignX = (realDirection == SlideDirection.RIGHT) ? (availWidth - natWidth) : 0;
+ 
+         let actorBox = new Clutter.ActorBox();
+         actorBox.x1 = alignX;
+-- 
+2.1.0
+
+
+From ae265eb3f7d1b8c4f480e61bbc8d3a01dbed34db Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 10 Oct 2014 10:58:42 +0200
+Subject: [PATCH 8/8] overviewControls: Really fix x align
+
+Commit a4475465f1f2 fixed the wrong alignment for the fully visible
+control, but regressed the partially slid-out one; take the slideX
+factor into account to get the right offset for both cases.
+---
+ js/ui/overviewControls.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/overviewControls.js b/js/ui/overviewControls.js
+index 1d1c550..4f5bb7f 100644
+--- a/js/ui/overviewControls.js
++++ b/js/ui/overviewControls.js
+@@ -62,7 +62,8 @@ const SlideLayout = new Lang.Class({
+         // flags only determine what to do if the allocated box is bigger
+         // than the actor's box.
+         let realDirection = getRtlSlideDirection(this._direction, child);
+-        let alignX = (realDirection == SlideDirection.RIGHT) ? (availWidth - natWidth) : 0;
++        let alignX = (realDirection == SlideDirection.LEFT) ? (availWidth - natWidth)
++                                                            : (availWidth - natWidth * this._slideX);
+ 
+         let actorBox = new Clutter.ActorBox();
+         actorBox.x1 = alignX;
+-- 
+2.1.0
+

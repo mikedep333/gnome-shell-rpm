@@ -1,0 +1,43 @@
+From 3d27dda8915fee31fa25c992649b01ab9dd02e7b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 16 Jan 2014 07:41:46 -0500
+Subject: [PATCH] dateMenu: Try to use the default calendar application
+
+Commit 14ceb10555699 changed the "Open Calendar" item to open the
+"recommended" calendar application rather than the default one to
+avoid problems with MIME subclassing (namely falling back to the
+default text editor when no calendar app is installed).
+With this change however, the application launched does no longer
+necessarily match the one configured in Settings, which is unexpected.
+To avoid both problems, use the default calendar application again,
+but only if it is in the list of recommended applications.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=722333
+---
+ js/ui/dateMenu.js | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/js/ui/dateMenu.js b/js/ui/dateMenu.js
+index 32fdd59..232af27 100644
+--- a/js/ui/dateMenu.js
++++ b/js/ui/dateMenu.js
+@@ -223,10 +223,13 @@ const DateMenuButton = new Lang.Class({
+             return this._calendarApp;
+ 
+         let apps = Gio.AppInfo.get_recommended_for_type('text/calendar');
+-        if (apps && (apps.length > 0))
+-            this._calendarApp = apps[0];
+-        else
++        if (apps && (apps.length > 0)) {
++            let app = Gio.AppInfo.get_default_for_type('text/calendar', false);
++            let defaultInRecommended = apps.some(function(a) { return a.equal(app); });
++            this._calendarApp = defaultInRecommended ? app : apps[0];
++        } else {
+             this._calendarApp = null;
++        }
+         return this._calendarApp;
+     },
+ 
+-- 
+2.1.0
+

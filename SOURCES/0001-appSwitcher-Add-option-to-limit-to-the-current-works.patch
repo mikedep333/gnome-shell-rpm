@@ -1,0 +1,72 @@
+From 4baaf4cccb723968637580e70ce1b6f4fcee1e39 Mon Sep 17 00:00:00 2001
+From: Adel Gadllah <adel.gadllah@gmail.com>
+Date: Thu, 4 Jul 2013 19:24:30 +0200
+Subject: [PATCH] appSwitcher: Add option to limit to the current workspace
+
+Add an option to limit the appSwitcher to the current workspace. For users
+that use workspaces for task separation this more convient then current
+behviour. While having to add an option is unfortunate there is no way to make
+both groups happy as workspaces usage differes between different users / types
+of users.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=703538
+---
+ data/org.gnome.shell.gschema.xml.in.in | 13 +++++++++++++
+ js/ui/altTab.js                        |  9 +++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/data/org.gnome.shell.gschema.xml.in.in b/data/org.gnome.shell.gschema.xml.in.in
+index 04d150c..81809d8 100644
+--- a/data/org.gnome.shell.gschema.xml.in.in
++++ b/data/org.gnome.shell.gschema.xml.in.in
+@@ -189,6 +189,19 @@ value here is from the GsmPresenceStatus enumeration.</_summary>
+     </key>
+   </schema>
+ 
++  <schema id="org.gnome.shell.app-switcher"
++          path="/org/gnome/shell/app-switcher/"
++          gettext-domain="@GETTEXT_PACKAGE@">
++    <key type="b" name="current-workspace-only">
++      <default>false</default>
++      <summary>Limit switcher to current workspace.</summary>
++      <description>
++	If true, only applications that have windows on the current workspace are shown in the switcher.
++	Otherwise, all applications are included.
++      </description>
++    </key>
++  </schema>
++
+   <enum id="org.gnome.shell.window-switcher.AppIconMode">
+     <value value="1" nick="thumbnail-only"/>
+     <value value="2" nick="app-icon-only"/>
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index 34d83e4..9d47d1e 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -436,8 +436,11 @@ const AppSwitcher = new Lang.Class({
+         this._arrows = [];
+ 
+         let windowTracker = Shell.WindowTracker.get_default();
++        let settings = new Gio.Settings({ schema: 'org.gnome.shell.app-switcher' });
++        let workspace = settings.get_boolean('current-workspace-only') ? global.screen.get_active_workspace()
++                                                                       : null;
+         let allWindows = global.display.get_tab_list(Meta.TabList.NORMAL,
+-                                                     global.screen, null);
++                                                     global.screen, workspace);
+ 
+         // Construct the AppIcons, add to the popup
+         for (let i = 0; i < apps.length; i++) {
+@@ -447,7 +450,9 @@ const AppSwitcher = new Lang.Class({
+             appIcon.cachedWindows = allWindows.filter(function(w) {
+                 return windowTracker.get_window_app (w) == appIcon.app;
+             });
+-            this._addIcon(appIcon);
++            if (workspace == null || appIcon.cachedWindows.length > 0) {
++                this._addIcon(appIcon);
++            }
+         }
+ 
+         this._curApp = -1;
+-- 
+2.1.0
+

@@ -1,0 +1,131 @@
+From b2f4c99a00e6d69db88b24e2d723f71b272443de Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 15 Apr 2014 17:24:07 +0200
+Subject: [PATCH 1/2] layout: Don't always extend struts to the screen edge
+
+NetWM struts are defined in terms of screen edges (rather than monitor
+edges), which works poorly with vertical monitor layouts (as it renders
+entire monitors unusable). Don't extend struts in those cases.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=663690
+---
+ js/ui/layout.js | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/js/ui/layout.js b/js/ui/layout.js
+index 141eecc..3dcc858 100644
+--- a/js/ui/layout.js
++++ b/js/ui/layout.js
+@@ -1006,19 +1006,39 @@ const LayoutManager = new Lang.Class({
+                     continue;
+ 
+                 // Ensure that the strut rects goes all the way to the screen edge,
+-                // as this really what mutter expects.
++                // as this really what mutter expects. However skip this step
++                // in cases where this would render an entire monitor unusable.
+                 switch (side) {
+                 case Meta.Side.TOP:
+-                    y1 = 0;
++                    let hasMonitorsAbove = this.monitors.some(Lang.bind(this,
++                        function(mon) {
++                            return this._isAboveOrBelowPrimary(mon) &&
++                                   mon.y < primary.y;
++                        }));
++                    if (!hasMonitorsAbove)
++                        y1 = 0;
+                     break;
+                 case Meta.Side.BOTTOM:
+-                    y2 = global.screen_height;
++                    if (this.primaryIndex == this.bottomIndex)
++                        y2 = global.screen_height;
+                     break;
+                 case Meta.Side.LEFT:
+-                    x1 = 0;
++                    let hasMonitorsLeft = this.monitors.some(Lang.bind(this,
++                        function(mon) {
++                            return !this._isAboveOrBelowPrimary(mon) &&
++                                   mon.x < primary.x;
++                        }));
++                    if (!hasMonitorsLeft)
++                        x1 = 0;
+                     break;
+                 case Meta.Side.RIGHT:
+-                    x2 = global.screen_width;
++                    let hasMonitorsRight = this.monitors.some(Lang.bind(this,
++                        function(mon) {
++                            return !this._isAboveOrBelowPrimary(mon) &&
++                                   mon.x > primary.x;
++                        }));
++                    if (!hasMonitorsRight)
++                        x2 = global.screen_width;
+                     break;
+                 }
+ 
+-- 
+2.1.0
+
+
+From ecdd65097513ff9b36afde817db8627b933da7e3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 11 Jun 2014 02:16:43 +0200
+Subject: [PATCH 2/2] layout: Do not expand struts to screen edges
+
+set_builtin_struts() in mutter now handles this for us, so we can kill
+off the extra code here.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=730527
+---
+ js/ui/layout.js | 37 -------------------------------------
+ 1 file changed, 37 deletions(-)
+
+diff --git a/js/ui/layout.js b/js/ui/layout.js
+index 3dcc858..2f0a5a5 100644
+--- a/js/ui/layout.js
++++ b/js/ui/layout.js
+@@ -1005,43 +1005,6 @@ const LayoutManager = new Lang.Class({
+                 else
+                     continue;
+ 
+-                // Ensure that the strut rects goes all the way to the screen edge,
+-                // as this really what mutter expects. However skip this step
+-                // in cases where this would render an entire monitor unusable.
+-                switch (side) {
+-                case Meta.Side.TOP:
+-                    let hasMonitorsAbove = this.monitors.some(Lang.bind(this,
+-                        function(mon) {
+-                            return this._isAboveOrBelowPrimary(mon) &&
+-                                   mon.y < primary.y;
+-                        }));
+-                    if (!hasMonitorsAbove)
+-                        y1 = 0;
+-                    break;
+-                case Meta.Side.BOTTOM:
+-                    if (this.primaryIndex == this.bottomIndex)
+-                        y2 = global.screen_height;
+-                    break;
+-                case Meta.Side.LEFT:
+-                    let hasMonitorsLeft = this.monitors.some(Lang.bind(this,
+-                        function(mon) {
+-                            return !this._isAboveOrBelowPrimary(mon) &&
+-                                   mon.x < primary.x;
+-                        }));
+-                    if (!hasMonitorsLeft)
+-                        x1 = 0;
+-                    break;
+-                case Meta.Side.RIGHT:
+-                    let hasMonitorsRight = this.monitors.some(Lang.bind(this,
+-                        function(mon) {
+-                            return !this._isAboveOrBelowPrimary(mon) &&
+-                                   mon.x > primary.x;
+-                        }));
+-                    if (!hasMonitorsRight)
+-                        x2 = global.screen_width;
+-                    break;
+-                }
+-
+                 let strutRect = new Meta.Rectangle({ x: x1, y: y1, width: x2 - x1, height: y2 - y1});
+                 let strut = new Meta.Strut({ rect: strutRect, side: side });
+                 struts.push(strut);
+-- 
+2.1.0
+

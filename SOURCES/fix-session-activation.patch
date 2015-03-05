@@ -1,0 +1,120 @@
+From 7f19d43041c8402904012c89c53060208efe5016 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Thu, 13 Nov 2014 09:26:52 -0500
+Subject: [PATCH] loginDialog: only emit session-activated on user action
+
+Right now we emit session-activated any time the bullet
+moves in the session menu. That includes at start up when
+picking an item arbitrarily, and any time GDM reports the
+session was read from the user's account settings.
+
+session-activated informs GDM about the newly selected session,
+so emitting it in response to GDM reporting a session is a
+bad idea (it's not only pointless, but it can least to
+oscillations)
+
+This commit changes the code to only emit session-activated when
+the user explicitly activates a session item from the gear menu.
+---
+ js/gdm/loginDialog.js | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
+index 9ee259f..ec88c73 100644
+--- a/js/gdm/loginDialog.js
++++ b/js/gdm/loginDialog.js
+@@ -327,90 +327,86 @@ const SessionMenuButton = new Lang.Class({
+             this._menu.toggle();
+         }));
+ 
+         this._items = {};
+         this._activeSessionId = null;
+         this._populate();
+     },
+ 
+     updateSensitivity: function(sensitive) {
+         this._button.reactive = sensitive;
+         this._button.can_focus = sensitive;
+         this._menu.close(BoxPointer.PopupAnimation.NONE);
+     },
+ 
+     _updateOrnament: function() {
+         let itemIds = Object.keys(this._items);
+         for (let i = 0; i < itemIds.length; i++) {
+             if (itemIds[i] == this._activeSessionId)
+                 this._items[itemIds[i]].setShowDot(true);
+             else
+                 this._items[itemIds[i]].setShowDot(false);
+         }
+     },
+ 
+     setActiveSession: function(sessionId) {
+          if (sessionId == this._activeSessionId)
+              return;
+ 
+          this._activeSessionId = sessionId;
+          this._updateOrnament();
+-
+-         this.emit('session-activated', this._activeSessionId);
+     },
+ 
+     close: function() {
+         this._menu.close();
+     },
+ 
+     _populate: function() {
+         let ids = Gdm.get_session_ids();
+         ids.sort();
+ 
+         if (ids.length <= 1) {
+             this._button.hide();
+             return;
+         }
+ 
+         for (let i = 0; i < ids.length; i++) {
+             let [sessionName, sessionDescription] = Gdm.get_session_name_and_description(ids[i]);
+ 
+             let id = ids[i];
+             let item = new PopupMenu.PopupMenuItem(sessionName);
+             this._menu.addMenuItem(item);
+             this._items[id] = item;
+ 
+-            if (!this._activeSessionId)
+-                this.setActiveSession(id);
+-
+             item.connect('activate', Lang.bind(this, function() {
+                 this.setActiveSession(id);
++                this.emit('session-activated', this._activeSessionId);
+             }));
+         }
+     }
+ });
+ Signals.addSignalMethods(SessionMenuButton.prototype);
+ 
+ const LoginDialog = new Lang.Class({
+     Name: 'LoginDialog',
+ 
+     _init: function(parentActor) {
+         this.actor = new Shell.GenericContainer({ style_class: 'login-dialog',
+                                                   visible: false });
+         this.actor.get_accessible().set_role(Atk.Role.WINDOW);
+ 
+         this.actor.add_constraint(new Layout.MonitorConstraint({ primary: true }));
+         this.actor.connect('allocate', Lang.bind(this, this._onAllocate));
+         this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
+         parentActor.add_child(this.actor);
+ 
+         this._userManager = AccountsService.UserManager.get_default()
+         let gdmClient = new Gdm.Client();
+ 
+         if (GLib.getenv('GDM_GREETER_TEST') != '1') {
+             this._greeter = gdmClient.get_greeter_sync(null);
+ 
+             this._greeter.connect('default-session-name-changed',
+                                   Lang.bind(this, this._onDefaultSessionChanged));
+ 
+             this._greeter.connect('session-opened',
+                                   Lang.bind(this, this._onSessionOpened));
+-- 
+2.1.0
+
