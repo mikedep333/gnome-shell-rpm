@@ -1,0 +1,87 @@
+From ba5eacc70a296d9753bfc2b8de14e08726212b69 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 3 Jul 2015 13:54:36 -0400
+Subject: [PATCH] screenShield: unblank when inserting smartcard
+
+If a user inserts the smartcard when the screen is locked/blanked
+we should ask them their pin right away.
+
+At the moment they have to wiggle the mouse or do some other
+action to get the screen to unblank.
+---
+ js/ui/screenShield.js | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/screenShield.js b/js/ui/screenShield.js
+index 3a84468..ad7ce54 100644
+--- a/js/ui/screenShield.js
++++ b/js/ui/screenShield.js
+@@ -510,62 +510,64 @@ const ScreenShield = new Lang.Class({
+         this._dragAction.connect('gesture-progress', Lang.bind(this, this._onDragMotion));
+         this._dragAction.connect('gesture-end', Lang.bind(this, this._onDragEnd));
+         this._lockScreenGroup.add_action(this._dragAction);
+ 
+         this._lockDialogGroup = new St.Widget({ x_expand: true,
+                                                 y_expand: true,
+                                                 reactive: true,
+                                                 pivot_point: new Clutter.Point({ x: 0.5, y: 0.5 }),
+                                                 name: 'lockDialogGroup' });
+ 
+         this.actor.add_actor(this._lockDialogGroup);
+         this.actor.add_actor(this._lockScreenGroup);
+ 
+         this._presence = new GnomeSession.Presence(Lang.bind(this, function(proxy, error) {
+             if (error) {
+                 logError(error, 'Error while reading gnome-session presence');
+                 return;
+             }
+ 
+             this._onStatusChanged(proxy.status);
+         }));
+         this._presence.connectSignal('StatusChanged', Lang.bind(this, function(proxy, senderName, [status]) {
+             this._onStatusChanged(status);
+         }));
+ 
+         this._screenSaverDBus = new ShellDBus.ScreenSaverDBus(this);
+ 
+         this._smartcardManager = SmartcardManager.getSmartcardManager();
+         this._smartcardManager.connect('smartcard-inserted',
+                                        Lang.bind(this, function(manager, token) {
+-                                           if (this._isLocked && token.UsedToLogin)
++                                           if (this._isLocked && token.UsedToLogin) {
++                                               this._wakeUpScreen();
+                                                this._liftShield(true, 0);
++                                           }
+                                        }));
+ 
+         this._oVirtCredentialsManager = OVirt.getOVirtCredentialsManager();
+         this._oVirtCredentialsManager.connect('user-authenticated',
+                                               Lang.bind(this, function() {
+                                                   if (this._isLocked)
+                                                       this._liftShield(true, 0);
+                                               }));
+ 
+         this._inhibitor = null;
+         this._aboutToSuspend = false;
+         this._loginManager = LoginManager.getLoginManager();
+         this._loginManager.connect('prepare-for-sleep',
+                                    Lang.bind(this, this._prepareForSleep));
+         this._inhibitSuspend();
+ 
+         this._loginManager.getCurrentSessionProxy(Lang.bind(this,
+             function(sessionProxy) {
+                 this._loginSession = sessionProxy;
+                 this._loginSession.connectSignal('Lock', Lang.bind(this, function() { this.lock(false); }));
+                 this._loginSession.connectSignal('Unlock', Lang.bind(this, function() { this.deactivate(false); }));
+             }));
+ 
+         this._settings = new Gio.Settings({ schema_id: SCREENSAVER_SCHEMA });
+ 
+         this._isModal = false;
+         this._hasLockScreen = false;
+         this._isGreeter = false;
+         this._isActive = false;
+         this._isLocked = false;
+-- 
+2.3.7
+

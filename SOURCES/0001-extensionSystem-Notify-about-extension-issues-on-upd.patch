@@ -1,0 +1,69 @@
+From 04ef143e61be7445bc643298cd1cbd99f9c57383 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Mon, 21 Sep 2015 20:18:12 +0200
+Subject: [PATCH] extensionSystem: Notify about extension issues on update
+
+---
+ js/ui/extensionSystem.js | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/js/ui/extensionSystem.js b/js/ui/extensionSystem.js
+index a69308d..b5e189c 100644
+--- a/js/ui/extensionSystem.js
++++ b/js/ui/extensionSystem.js
+@@ -7,6 +7,7 @@ const GLib = imports.gi.GLib;
+ const Gio = imports.gi.Gio;
+ const St = imports.gi.St;
+ 
++const Config = imports.misc.config;
+ const ExtensionUtils = imports.misc.extensionUtils;
+ const Main = imports.ui.main;
+ 
+@@ -286,6 +287,36 @@ function _onVersionValidationChanged() {
+     }
+ }
+ 
++function _doUpdateCheck() {
++    let version = Config.PACKAGE_VERSION.split('.');
++    if (parseInt(version[1]) % 2 == 0)
++        version.pop();
++
++    let pkgCacheDir = GLib.get_user_cache_dir() + '/gnome-shell/';
++    let updateStamp = Gio.file_new_for_path(pkgCacheDir +
++                                            'update-check-' + version.join('.'));
++    if (updateStamp.query_exists(null))
++        return;
++
++    GLib.mkdir_with_parents (pkgCacheDir, 0755);
++    updateStamp.create(0, null).close(null);
++
++   let nOutdated = enabledExtensions.reduce(function(n, uuid) {
++       let extension = ExtensionUtils.extensions[uuid];
++       if (extension && extension.state == ExtensionState.OUT_OF_DATE)
++           n++;
++       return n;
++   }, 0);
++
++   if (nOutdated == 0)
++       return;
++
++   Main.notify(ngettext("%d extension is out of date",
++                        "%d extensions are out of date",
++                        nOutdated).format(nOutdated),
++               _("You can visit http://extensions.gnome.org for updates"));
++}
++
+ function _loadExtensions() {
+     global.settings.connect('changed::' + ENABLED_EXTENSIONS_KEY, onEnabledExtensionsChanged);
+     global.settings.connect('changed::' + EXTENSION_DISABLE_VERSION_CHECK_KEY, _onVersionValidationChanged);
+@@ -299,6 +330,7 @@ function _loadExtensions() {
+             extension.type = ExtensionUtils.ExtensionType.SESSION_MODE;
+     });
+     finder.scanExtensions();
++    _doUpdateCheck();
+ }
+ 
+ function enableAllExtensions() {
+-- 
+2.5.0
+

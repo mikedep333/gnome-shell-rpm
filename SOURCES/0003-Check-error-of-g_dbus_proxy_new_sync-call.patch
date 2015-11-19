@@ -1,0 +1,30 @@
+From 18c713823719c9876a9824ba4bd0ba5c41cc07be Mon Sep 17 00:00:00 2001
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Thu, 24 Sep 2015 13:31:07 -0400
+Subject: [PATCH 3/3] Check error of g_dbus_proxy_new_sync call
+
+Otherwise errors pile up and we crash later on.
+---
+ src/main.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/main.c b/src/main.c
+index b33d4bf..e8ac998 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -132,6 +132,12 @@ shell_dbus_init (gboolean replace)
+                                NULL, /* cancellable */
+                                &error);
+ 
++  if (!bus)
++    {
++      g_printerr ("Failed to get a session bus proxy: %s", error->message);
++      exit (1);
++    }
++
+   request_name_flags = G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT;
+   if (replace)
+     request_name_flags |= DBUS_NAME_FLAG_REPLACE_EXISTING;
+-- 
+2.5.3
+

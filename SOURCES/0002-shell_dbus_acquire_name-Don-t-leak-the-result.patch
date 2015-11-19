@@ -1,0 +1,26 @@
+From 3f0fbae7e213b2fbe7267b9d25ac7fcfaa8afcff Mon Sep 17 00:00:00 2001
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Thu, 24 Sep 2015 13:17:36 -0400
+Subject: [PATCH 2/3] shell_dbus_acquire_name: Don't leak the result
+
+The GVariant returned by g_dbus_proxy_call_sync must be
+freed with g_variant_unref, to prevent a leak.
+---
+ src/main.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/main.c b/src/main.c
+index fb0ea43..b33d4bf 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -75,6 +75,7 @@ shell_dbus_acquire_name (GDBusProxy  *bus,
+       exit (1);
+     }
+   g_variant_get (request_name_variant, "(u)", request_name_result);
++  g_variant_unref (request_name_variant);
+ }
+ 
+ static void
+-- 
+2.5.3
+

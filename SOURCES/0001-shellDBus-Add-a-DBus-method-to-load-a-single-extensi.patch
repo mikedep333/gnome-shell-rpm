@@ -1,4 +1,4 @@
-From 193ac75919f663122fd3a9ef3bd5342fffe79dde Mon Sep 17 00:00:00 2001
+From daf38420dcdd70c090cf146973f0b3f4522a532c Mon Sep 17 00:00:00 2001
 From: Rui Matos <tiagomatos@gmail.com>
 Date: Fri, 8 Nov 2013 11:36:04 +0100
 Subject: [PATCH 1/2] shellDBus: Add a DBus method to load a single extension
@@ -10,21 +10,21 @@ file and load it into the running shell.
  1 file changed, 20 insertions(+)
 
 diff --git a/js/ui/shellDBus.js b/js/ui/shellDBus.js
-index 84597fd..d3a3a05 100644
+index a87ea41..f8b05f4 100644
 --- a/js/ui/shellDBus.js
 +++ b/js/ui/shellDBus.js
-@@ -266,6 +266,10 @@ const GnomeShellExtensionsIface = <interface name="org.gnome.Shell.Extensions">
- </method>
- <method name="CheckForUpdates">
- </method>
-+<method name="LoadUserExtension">
-+    <arg type="s" direction="in" name="uuid"/>
-+    <arg type="b" direction="out" name="success"/>
-+</method>
- <property name="ShellVersion" type="s" access="read" />
- </interface>;
- 
-@@ -365,6 +369,22 @@ const GnomeShellExtensions = new Lang.Class({
+@@ -283,6 +283,10 @@ const GnomeShellExtensionsIface = '<node> \
+ </method> \
+ <method name="CheckForUpdates"> \
+ </method> \
++<method name="LoadUserExtension"> \
++    <arg type="s" direction="in" name="uuid"/> \
++    <arg type="b" direction="out" name="success"/> \
++</method> \
+ <property name="ShellVersion" type="s" access="read" /> \
+ </interface> \
+ </node>';
+@@ -385,6 +389,22 @@ const GnomeShellExtensions = new Lang.Class({
          ExtensionDownloader.checkForUpdates();
      },
  
@@ -48,5 +48,5 @@ index 84597fd..d3a3a05 100644
  
      _extensionStateChanged: function(_, newState) {
 -- 
-1.8.3.1
+2.3.3
 

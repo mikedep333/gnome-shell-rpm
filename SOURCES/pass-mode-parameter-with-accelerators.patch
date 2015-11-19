@@ -1,0 +1,80 @@
+From 17df7d3b30dee931d1934a5b8783749837569818 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 12 Nov 2014 21:21:44 +0100
+Subject: [PATCH 1/2] shellDBus: Change AcceleratorActivated signature
+
+Adding new parameters to the signal currently will break keybindings
+until gnome-settings-daemon is updated to the new API as well.
+Put additional parameters into a dictionary instead to make future
+extensions easier.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=711682
+---
+ js/ui/shellDBus.js | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/js/ui/shellDBus.js b/js/ui/shellDBus.js
+index f8b05f4..871a387 100644
+--- a/js/ui/shellDBus.js
++++ b/js/ui/shellDBus.js
+@@ -44,8 +44,7 @@ const GnomeShellIface = '<node> \
+ </method> \
+ <signal name="AcceleratorActivated"> \
+     <arg name="action" type="u" /> \
+-    <arg name="deviceid" type="u" /> \
+-    <arg name="timestamp" type="u" /> \
++    <arg name="parameters" type="a{sv}" /> \
+ </signal> \
+ <property name="Mode" type="s" access="read" /> \
+ <property name="OverviewActive" type="b" access="readwrite" /> \
+@@ -190,11 +189,13 @@ const GnomeShell = new Lang.Class({
+ 
+         let connection = this._dbusImpl.get_connection();
+         let info = this._dbusImpl.get_info();
++        let params = { 'device-id': GLib.Variant.new('u', deviceid),
++                       'timestamp': GLib.Variant.new('u', timestamp) };
+         connection.emit_signal(destination,
+                                this._dbusImpl.get_object_path(),
+                                info ? info.name : null,
+                                'AcceleratorActivated',
+-                               GLib.Variant.new('(uuu)', [action, deviceid, timestamp]));
++                               GLib.Variant.new('(ua{sv})', [action, params]));
+     },
+ 
+     _grabAcceleratorForSender: function(accelerator, flags, sender) {
+-- 
+2.3.6
+
+
+From 74a42c3f12fa23aa6cdb0f6f1fbe8464efd41640 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 12 Nov 2014 20:49:24 +0100
+Subject: [PATCH 2/2] shellDBus: Add mode parameter to AcceleratorActivated
+ signal
+
+This will allow g-s-d to handle actions differently based on the
+current mode - namely, allow the power button when locked, but
+make sure to never show any dialogs in that case.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=711682
+---
+ js/ui/shellDBus.js | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/shellDBus.js b/js/ui/shellDBus.js
+index 871a387..73fbb07 100644
+--- a/js/ui/shellDBus.js
++++ b/js/ui/shellDBus.js
+@@ -190,7 +190,8 @@ const GnomeShell = new Lang.Class({
+         let connection = this._dbusImpl.get_connection();
+         let info = this._dbusImpl.get_info();
+         let params = { 'device-id': GLib.Variant.new('u', deviceid),
+-                       'timestamp': GLib.Variant.new('u', timestamp) };
++                       'timestamp': GLib.Variant.new('u', timestamp),
++                       'action-mode': GLib.Variant.new('u', Main.actionMode) };
+         connection.emit_signal(destination,
+                                this._dbusImpl.get_object_path(),
+                                info ? info.name : null,
+-- 
+2.3.6
+

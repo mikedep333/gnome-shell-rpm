@@ -1,4 +1,4 @@
-From 5389581bdba7f5c84c4cd550b0a04f3854ef8bb9 Mon Sep 17 00:00:00 2001
+From dcdf2c26467818b2ee9999dc103242b3e3cd1416 Mon Sep 17 00:00:00 2001
 From: Rui Matos <tiagomatos@gmail.com>
 Date: Fri, 8 Nov 2013 13:58:09 +0100
 Subject: [PATCH 2/2] extensions: Add a SESSION_MODE extension type
@@ -11,7 +11,7 @@ different way since they can't be disabled.
  2 files changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/js/misc/extensionUtils.js b/js/misc/extensionUtils.js
-index 7c6769a..a46929a 100644
+index afdc3cd..8541cf6 100644
 --- a/js/misc/extensionUtils.js
 +++ b/js/misc/extensionUtils.js
 @@ -15,7 +15,8 @@ const FileUtils = imports.misc.fileUtils;
@@ -25,12 +25,12 @@ index 7c6769a..a46929a 100644
  
  // Maps uuid -> metadata object
 diff --git a/js/ui/extensionSystem.js b/js/ui/extensionSystem.js
-index 8c12e97..ba5db46 100644
+index 11a75c6..a69308d 100644
 --- a/js/ui/extensionSystem.js
 +++ b/js/ui/extensionSystem.js
-@@ -274,6 +274,8 @@ function _loadExtensions() {
+@@ -295,6 +295,8 @@ function _loadExtensions() {
      let finder = new ExtensionUtils.ExtensionFinder();
-     finder.connect('extension-found', function(signals, extension) {
+     finder.connect('extension-found', function(finder, extension) {
          loadExtension(extension);
 +        if (Main.sessionMode.enabledExtensions.indexOf(extension.uuid) != -1)
 +            extension.type = ExtensionUtils.ExtensionType.SESSION_MODE;
@@ -38,5 +38,5 @@ index 8c12e97..ba5db46 100644
      finder.scanExtensions();
  }
 -- 
-1.8.3.1
+2.3.3
 

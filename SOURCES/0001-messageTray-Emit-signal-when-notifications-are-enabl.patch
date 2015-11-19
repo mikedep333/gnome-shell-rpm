@@ -1,0 +1,32 @@
+From e598852366619893def62b0a99ef69bc7cfc5c0f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 12 May 2015 21:27:59 +0200
+Subject: [PATCH] messageTray: Emit signal when notifications are
+ enabled/disabled
+
+Since the introduction of per-source notification policy in commit
+098bd4509ba0, the NotificationPolicy::enable-changed signal has been
+used to track the 'enable' settings. However as we never actually
+emitted that signal, this never worked without a restart - oops.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=749279
+---
+ js/ui/messageTray.js | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/js/ui/messageTray.js b/js/ui/messageTray.js
+index a034fc3..f1ce7f2 100644
+--- a/js/ui/messageTray.js
++++ b/js/ui/messageTray.js
+@@ -392,6 +392,8 @@ const NotificationApplicationPolicy = new Lang.Class({
+ 
+     _changed: function(settings, key) {
+         this.emit('policy-changed', key);
++        if (key == 'enable')
++            this.emit('enable-changed');
+     },
+ 
+     _canonicalizeId: function(id) {
+-- 
+2.3.6
+

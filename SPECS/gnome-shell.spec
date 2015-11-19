@@ -1,6 +1,6 @@
 Name:           gnome-shell
-Version:        3.8.4
-Release:        45%{?dist}
+Version:        3.14.4
+Release:        37%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -8,69 +8,49 @@ License:        GPLv2+
 Provides:       desktop-notification-daemon
 URL:            http://live.gnome.org/GnomeShell
 #VCS:           git:git://git.gnome.org/gnome-shell
-Source0:        http://download.gnome.org/sources/gnome-shell/3.8/%{name}-%{version}.tar.xz
+Source0:        http://download.gnome.org/sources/gnome-shell/3.14/%{name}-%{version}.tar.xz
 Source1:	org.gnome.shell.gschema.override
 
 # Replace Epiphany with Firefox in the default favourite apps list
 Patch1: gnome-shell-favourite-apps-firefox.patch
 Patch2: gnome-shell-favourite-apps-yelp.patch
 Patch3: gnome-shell-favourite-apps-terminal.patch
-Patch4: gnome-shell-favourite-apps-empathy.patch
 
-Patch10: 0001-popupMenu-Fix-removing-the-active-menu-from-PopupMen.patch
-Patch11: 0001-catch-more-errors-on-extensions-enable-and-disable.patch
-Patch12: vertical-monitor-layouts.patch
-Patch13: fix-thumbail-box-shrinking.patch
-Patch14: 0001-dateMenu-Try-to-use-the-default-calendar-application.patch
-Patch15: 0001-appSwitcher-Add-option-to-limit-to-the-current-works.patch
-
-Patch20: 0001-main-allow-session-mode-to-be-specified-in-the-envir.patch
-
-Patch30: 0001-network-Do-not-use-timestamp-to-identify-connections.patch
-Patch31: 0001-network-Don-t-disable-switch-in-wifi-section-while-c.patch
-
-Patch40: fix-remote-search-provider-loading.patch
+Patch10: support-headless-mode.patch
+Patch11: fix-menu-ornament-oddities.patch
 
 Patch50: fix-background-leaks.patch
 
-Patch60: 0001-main-Actually-respect-hasWorkspaces.patch
-Patch61: 0001-main-Close-runDialog-as-necessary-on-session-mode-ch.patch
-Patch62: 0001-keyring-Don-t-unregister-the-prompt-when-disabled.patch
-Patch63: 0002-keyring-Cancel-active-prompts-on-disable.patch
-
-Patch70: 0001-screenshot-Extend-ScreenshotArea-parameter-validatio.patch
-Patch71: 0002-screencast-Fix-disabling-screencasts-via-session-mod.patch
-Patch72: 0003-screencast-Validate-parameters-of-ScreencastArea.patch
-Patch73: 0001-screenshot-Also-validate-parameters-to-FlashArea.patch
-Patch74: 0001-shell-screenshot-Only-allow-one-screenshot-request-a.patch
-Patch75: respect-disk-writes-lockdown-setting.patch
-
+Patch60: drop-gsystem-dependency.patch
+Patch61: 0001-messageTray-Emit-signal-when-notifications-are-enabl.patch
+Patch62: pass-mode-parameter-with-accelerators.patch
 Patch80: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
 Patch81: 0002-extensions-Add-a-SESSION_MODE-extension-type.patch
+Patch82: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
+Patch83: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
 
 Patch90: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
+Patch91: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
+Patch92: 0001-gdm-honor-timed-login-delay-even-if-animations-disab.patch
 
 Patch99: login-screen-backport.patch
-Patch100: gdm-support-pre-authenticated-logins-from-oVirt.patch
-Patch101: dont-load-user-list-when-disabled.patch
-Patch102: disallow-cancel-after-success.patch
-Patch103: fix-login-screen-focus.patch
-Patch104: fix-cancel-sensitivity.patch
-Patch105: login-banner-fixes.patch
-Patch106: fix-session-activation.patch
+Patch100: 0001-screenShield-unblank-when-inserting-smartcard.patch
+Patch101: enforce-smartcard-at-unlock.patch
+Patch102: disable-unlock-entry-until-question.patch
 
-Patch110: 0001-Add-support-for-meta_restart-and-MetaDisplay-restart.patch
+Patch110: 0001-shell_dbus_acquire_name-Don-t-leak-error.patch
+Patch111: 0002-shell_dbus_acquire_name-Don-t-leak-the-result.patch
+Patch112: 0003-Check-error-of-g_dbus_proxy_new_sync-call.patch
 
-%define clutter_version 1.13.4
-%define gnome_bluetooth_version 3.5.5
-%define gobject_introspection_version 0.10.1
-%define gjs_version 1.35.4
-%define mutter_version 3.8.4-12
+%define clutter_version 1.15.90
+%define gnome_bluetooth_version 1:3.9.0
+%define gobject_introspection_version 1.41.0
+%define gjs_version 1.39.0
+%define mutter_version 3.14.1
 %define eds_version 3.5.3
 %define gnome_desktop_version 3.7.90
-%define gnome_menus_version 3.5.3
 %define json_glib_version 0.13.2
-%define gsettings_desktop_schemas_version 3.7.4
+%define gsettings_desktop_schemas_version 3.11.4
 %define caribou_version 0.4.8
 %define libcroco_version 0.6.8
 %define telepathy_logger_version 0.2.6
@@ -81,7 +61,6 @@ BuildRequires:  automake >= 1.10
 BuildRequires:  gnome-common >= 2.2.0
 BuildRequires:  libtool >= 1.4.3
 BuildRequires:  caribou-devel >= %{caribou_version}
-BuildRequires:  chrpath
 BuildRequires:  clutter-devel >= %{clutter_version}
 BuildRequires:  dbus-glib-devel
 BuildRequires:  desktop-file-utils
@@ -89,7 +68,6 @@ BuildRequires:  evolution-data-server-devel >= %{eds_version}
 BuildRequires:  gcr-devel
 BuildRequires:  gjs-devel >= %{gjs_version}
 BuildRequires:  glib2-devel
-BuildRequires:  gnome-menus-devel >= %{gnome_menus_version}
 BuildRequires:  gobject-introspection >= %{gobject_introspection_version}
 BuildRequires:  json-glib-devel >= %{json_glib_version}
 BuildRequires:  upower-devel
@@ -122,8 +100,7 @@ BuildRequires: gtk-doc gnome-common
 %ifnarch s390 s390x
 Requires:       gnome-bluetooth%{?_isa} >= %{gnome_bluetooth_version}
 %endif
-Requires:       gnome-desktop3 >= %{gnome_desktop_version}
-Requires:       gnome-menus%{?_isa} >= %{gnome_menus_version}
+Requires:       gnome-desktop3%{?_isa} >= %{gnome_desktop_version}
 # wrapper script uses to restart old GNOME session if run --replace
 # from the command line
 Requires:       gobject-introspection%{?_isa} >= %{gobject_introspection_version}
@@ -132,6 +109,8 @@ Requires:       gjs%{?_isa} >= %{gjs_version}
 Requires:       librsvg2%{?_isa}
 # needed as it is now split from Clutter
 Requires:       json-glib%{?_isa} >= %{json_glib_version}
+# For $libdir/mozilla/plugins
+Requires:       mozilla-filesystem%{?_isa}
 Requires:       mutter%{?_isa} >= %{mutter_version}
 Requires:       upower%{?_isa}
 Requires:       polkit%{?_isa} >= 0.100
@@ -147,8 +126,9 @@ Requires:       caribou%{?_isa} >= %{caribou_version}
 Requires:       accountsservice-libs%{?_isa}
 Requires:       gdm-libs%{?_isa}
 Requires:       clutter%{?_isa} >= %{clutter_version}
-# needed for screen recording
-Requires:       gstreamer1-plugins-good
+# needed for settings items in menus
+Requires:	    control-center
+
 
 %description
 GNOME Shell provides core user interface functions for the GNOME 3 desktop,
@@ -172,54 +152,35 @@ be used only by extensions.gnome.org.
 %patch1 -p1 -b .firefox
 %patch2 -p1 -b .yelp
 %patch3 -p1 -b .terminal
-%patch4 -p1 -b .empathy
 
-%patch10 -p1 -b .fix-popup-menu-manager-exception
-%patch11 -p1 -b .catch-extension-errors
-%patch12 -p1 -b .improve-vertical-monitor-layouts
-%patch13 -p1 -b .fix-shrinking-workspace-switcher
-%patch14 -p1 -b .use-default-calendar-app
-%patch15 -p1 -b .current-workspace-app-switcher-option
-
-%patch20 -p1 -b .main-allow-session-mode-to-be-specified-in-the-envir
-
-%patch30 -p1 -b .fix-stuck-network-icon
-%patch31 -p1 -b .keep-wifi-switch
-
-%patch40 -p1 -b .fix-remote-search-provider-loading
+%patch10 -p1 -b .support-headless-start
+%patch11 -p1 -b .fix-menu-ornament-oddities
 
 %patch50 -p1 -b .fix-background-leaks
 
-%patch60 -p1 -b .support-has-workspaces
-%patch61 -p1 -b .close-run-dialog-on-lock
-%patch62 -p1 -b .prevent-fallback-keyring-dialog
-%patch63 -p1 -b .cancel-keyring-dialog-on-lock
-
-%patch70 -p1 -b .validate-screenshot-params
-%patch71 -p1 -b .fix-disable-screencasts
-%patch72 -p1 -b .validate-screencast-params
-%patch73 -p1 -b .validate-screenshot-params
-%patch74 -p1 -b .disallow-consecutive-screenshots
-%patch75 -p1 -b .respect-disk-writes-lockdown
+%patch60 -p1 -b .drop-gsystem-dependency
+%patch61 -p1 -b .fix-enable-notifications
+%patch62 -p1 -b .pass-mode-parameter-with-accelerators
 
 %patch80 -p1
 %patch81 -p1
+%patch82 -p1 -b .fix-magnifier-spew
+%patch83 -p1 -b .extension-update-notification
 
 %patch90 -p1 -b .panel-add-an-icon-to-the-ActivitiesButton
+%patch91 -p1 -b .change-fallback-app-name
+%patch92 -p1 -b .honor-timed-login-delay-even-if-animations-disabled
 
 %patch99 -p1 -b .login-screen-backport
-%patch100 -p1 -b .gdm-support-pre-authenticated-logins-from-oVirt
-%patch101 -p1 -b .dont-load-user-list-when-disabled
-%patch102 -p1 -b .disallow-cancel-after-success
-%patch103 -p1 -b .fix-login-screen-focus
-%patch104 -p1 -b .fix-cancel-sensitivity
-%patch105 -p1 -b .login-banner-fixes
-%patch106 -p1 -b .fix-session-activation
+%patch100 -p1 -b .unblank-when-inserting-smartcard
+%patch101 -p1 -b .enforce-smartcard-at-unlock-time
+%patch102 -p1 -b .disable-unlock-entry-until-question
 
-%patch110 -p1 -b .meta-restart
+%patch110 -p1 -b .dont-leak
+%patch111 -p1 -b .dont-leak-more
+%patch112 -p1 -b .clean-exit
 
 %build
-autoreconf -f
 (if ! test -x configure; then NOCONFIGURE=1 ./autogen.sh; fi;
  %configure --disable-static --disable-compile-warnings)
 make V=1 %{?_smp_mflags}
@@ -232,18 +193,11 @@ rm -rf %{buildroot}/%{_libdir}/mozilla/plugins/*.la
 desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell-extension-prefs.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/evolution-calendar.desktop
+rm -f %{buildroot}%{_datadir}/applications/gnome-shell-wayland.desktop
 
 cp %{SOURCE1} %{buildroot}/%{_datadir}/glib-2.0/schemas
 
 %find_lang %{name}
-
-%ifnarch s390 s390x ppc ppc64 ppc64p7
-# The libdir rpath breaks nvidia binary only folks, so we remove it.
-# See bug 716572
-# skip on s390(x), workarounds a chrpath issue
-chrpath -r %{_libdir}/gnome-shell:%{_libdir}/gnome-bluetooth $RPM_BUILD_ROOT%{_bindir}/gnome-shell
-chrpath -r %{_libdir}/gnome-bluetooth $RPM_BUILD_ROOT%{_libdir}/gnome-shell/libgnome-shell.so
-%endif
 
 %preun
 glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null ||:
@@ -262,11 +216,12 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_datadir}/applications/gnome-shell.desktop
 %{_datadir}/applications/gnome-shell-extension-prefs.desktop
 %{_datadir}/applications/evolution-calendar.desktop
-%{_datadir}/gnome-control-center/keybindings/50-gnome-shell-screenshot.xml
+%{_datadir}/applications/org.gnome.Shell.PortalHelper.desktop
 %{_datadir}/gnome-control-center/keybindings/50-gnome-shell-system.xml
 %{_datadir}/gnome-shell/
 %{_datadir}/dbus-1/services/org.gnome.Shell.CalendarServer.service
 %{_datadir}/dbus-1/services/org.gnome.Shell.HotplugSniffer.service
+%{_datadir}/dbus-1/services/org.gnome.Shell.PortalHelper.service
 %{_datadir}/dbus-1/interfaces/org.gnome.Shell.Screencast.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.Shell.Screenshot.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.ShellSearchProvider.xml
@@ -275,6 +230,7 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libexecdir}/gnome-shell-calendar-server
 %{_libexecdir}/gnome-shell-perf-helper
 %{_libexecdir}/gnome-shell-hotplug-sniffer
+%{_libexecdir}/gnome-shell-portal-helper
 # Co own these directories instead of pulling in GConf
 # after all, we are trying to get rid of GConf with these files
 %dir %{_datadir}/GConf
@@ -288,6 +244,166 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Tue Oct 13 2015 Ray Strode <rstrode@redhat.com> 3.14.4-37
+- Fix Username: entry when disable-user-list is on
+  Related: #1262999
+  Resolves: 1270378
+
+* Thu Oct 08 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-36
+- Improve connecting to a headless shell via VNC
+  Related: #1243856
+
+* Mon Oct 05 2015 Ray Strode <rstrode@redhat.com> 3.14.4-35
+- Ensure the unlock password entry is desensitized when there's
+  no password being asked for (Such as when the message is just
+  "Please insert smartcard")
+  Resolves: #1262999
+
+* Mon Sep 28 2015 Ray Strode <rstrode@redhat.com> 3.14.4-33
+- Enforce smartcard at unlock time, if it's used to login
+  Resolves: #1263759
+
+* Thu Sep 24 2015 Matthias Clasen <mclasen@redhat.com> - 3.14.4-32
+- Avoid abrt reports when the session bus is going away early
+  Resolves: #1254986
+
+* Mon Sep 21 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-31
+- Notify about outdated extensions on updates
+  Related: #1261552
+
+* Fri Sep 18 2015 Ray Strode <rstrode@redhat.com> 3.14.4-30
+- Another timed login update.  Makes the indicator work
+  when animations are disabled.
+  Related: #1252424
+
+* Tue Sep 15 2015 Ray Strode <rstrode@redhat.com> 3.14.4-29
+- Fix spew when turning on magnifier
+  Resolves: #1260057
+
+* Tue Sep 15 2015 Ray Strode <rstrode@redhat.com> 3.14.4-28
+- Drop gnome-session-xsession dependency
+  Resolves: #1251495
+
+* Fri Sep 11 2015 Ray Strode <rstrode@redhat.com> 3.14.4-27
+- Actually apply patch to unblank when inserting smartcard
+  Related: #1201756
+
+* Tue Aug 18 2015 Ray Strode <rstrode@redhat.com> 3.14.4-26
+- Fix timed login in virtual machines
+  Resolves: #1252424
+
+* Wed Aug 05 2015 Ray Strode <rstrode@redhat.com> 3.14.4-25
+- Fix user switching, which broke in 3.14.4-17
+  Related: #1220023
+
+* Thu Jul 30 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-24
+- Fix some menu ornament oddities
+  Related: #1174373
+
+* Fri Jul 24 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-23
+- Fix a couple more warnings when running headless
+  Related: #1243856
+
+* Thu Jul 23 2015 Ray Strode <rstrode@redhat.com> 3.14.4-22
+- One more update to Next button handling
+  Resolves: 1240623
+  Related: #1240615
+  Related: #1174373
+
+* Wed Jul 22 2015 Ray Strode <rstrode@redhat.com> 3.14.4-21
+- Make sure Next button starts out desensitized
+  Resolves: 1240623
+  Related: #1240615
+  Related: #1174373
+
+* Fri Jul 17 2015 Ray Strode <rstrode@redhat.com> 3.14.4-20
+- set next button to next when asking for username
+  Resolves: 1240615
+  Related: #1174373
+
+* Fri Jul 17 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-19
+- Fix bottom tray handling when running headless
+  Related: #1243856
+
+* Thu Jul 16 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-18
+- Support headless start
+  Resolves: #1243856
+
+* Wed Jul 15 2015 Ray Strode <rstrode@redhat.com> 3.14.4-17
+- Fix wonkiness if user hits escape from Not Listed screen
+  after typing wrong password
+  Resolves: #1220023
+
+* Fri Jul 10 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-16
+- Fix user list scrolling on login screen
+  Resolves: #1184802
+
+* Wed Jul 08 2015 Milan Crha <mcrha@redhat.com> 3.14.4-15
+- Rebuild against updated libical and evolution-data-server
+  Related: #1209787
+
+* Wed Jul 08 2015 Milan Crha <mcrha@redhat.com> 3.14.4-14
+- Rebuild against updated libical
+  Related: #1209787
+
+* Fri Jul 03 2015 Ray Strode <rstrode@redhat.com> 3.14.4-13
+- Unblank screen when a smartcard is inserted
+  Resolves: #1201756
+
+* Wed Jul 01 2015 Ray Strode <rstrode@redhat.com> 3.14.4-12
+- Ensure password authentication is used if no authentication scheme is configured
+- Ensure smartcard authentication is used if smartcard authentication is configured
+
+  Related: #1174373 1034968
+
+* Tue Jun 30 2015 Ray Strode <rstrode@redhat.com> 3.14.4-11
+- Fix cancel button from Not Listed? screen
+  Resolves: #1182035
+
+* Thu Jun 25 2015 Ray Strode <rstrode@redhat.com> 3.14.4-10
+- Make login banner overflow to book view at the right time
+  Resolves: #1217157
+
+* Fri Jun 12 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-9
+- Make login banner message more prominent
+  Resolves: rhbz#1182223
+
+* Thu May 21 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-8
+- Pass mode parameter with accelerators
+  Resolves: rhbz#1028451
+
+* Wed May 20 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-7
+- Change fallback app name
+  Resolves: rhbz#1125788
+
+* Wed May 20 2015 Ray Strode <rstrode@redhat.com> 3.14.4-6
+- More login screen backports
+  Related: rhbz#1174373
+
+* Thu May 14 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-5
+- Fix enabling/disabling per-app notifications
+  Resolves: rhbz#1051132
+
+* Fri May 08 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-4
+- Fix removal of libgsystem dependency
+  Related: rhbz#1174373
+
+* Thu May  7 2015 Matthias Clasen <mclasen@redhat.com> - 3.14.4-3
+- Drop use of libgsystem
+  Related: rhbz#1174373
+
+* Thu May 07 2015 Ray Strode <rstrode@redhat.com> 3.14.4-2
+- Drop chrpath weirdness
+- Readd browser plugin
+- Drop wayland desktop file
+  Related: rhbz#1174373
+
+* Thu May 04 2015 Florian Müllner <fmuellner@redhat.com> - 3.14.4-1
+- Update to latest stable 3.14 release
+
+* Mon May 04 2015 Florian Müllner <fmuellner@redhat.com> - 3.8.4-46
+- Rebuild for eds so name bump
+
 * Thu Nov 13 2014 Ray Strode <rstrode@redhat.com> 3.8.4-45
 - Don't inform GDM about session changes that came from GDM
   Resolves: #1163474
@@ -361,7 +477,7 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 - Add a patch for quadbuffer stereo suppport
   Resolves: rhbz#1108893
 
-* Wed Apr 16 2014 Florian Müllner <fmuellner@redhat.com> - 3.13.4-32
+* Wed Apr 16 2014 Florian Müllner <fmuellner@redhat.com> - 3.8.4-32
 - Improve vertical monitor layouts
   Resolves: rhbz#1075240
 

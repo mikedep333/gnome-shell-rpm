@@ -1,0 +1,115 @@
+From 46e5ac207a244960840a1d8108b780dd95a8146a Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 15 Sep 2015 14:04:07 -0400
+Subject: [PATCH] magnifier: don't spew to console when focus moves around
+
+We currently ship at-spi2 2.8 in 7.2 but gnome-shell 3.14 which
+depends on function names shipped in later versions of at-spi2.
+
+This commit works around the problem by using the names of the functions,
+as they existed in 2.8.
+---
+ js/ui/magnifier.js | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/js/ui/magnifier.js b/js/ui/magnifier.js
+index 101c14c..2fe99c6 100644
+--- a/js/ui/magnifier.js
++++ b/js/ui/magnifier.js
+@@ -690,78 +690,91 @@ const ZoomRegion = new Lang.Class({
+         this._background = null;
+         this._uiGroupClone = null;
+         this._mouseSourceActor = mouseSourceActor;
+         this._mouseActor  = null;
+         this._crossHairs = null;
+         this._crossHairsActor = null;
+ 
+         this._viewPortX = 0;
+         this._viewPortY = 0;
+         this._viewPortWidth = global.screen_width;
+         this._viewPortHeight = global.screen_height;
+         this._xCenter = this._viewPortWidth / 2;
+         this._yCenter = this._viewPortHeight / 2;
+         this._xMagFactor = 1;
+         this._yMagFactor = 1;
+         this._followingCursor = false;
+         this._xFocus = 0;
+         this._yFocus = 0;
+         this._xCaret = 0;
+         this._yCaret = 0;
+ 
+         Main.layoutManager.connect('monitors-changed',
+                                    Lang.bind(this, this._monitorsChanged));
+         this._focusCaretTracker.connect('caret-moved',
+                                     Lang.bind(this, this._updateCaret));
+         this._focusCaretTracker.connect('focus-changed',
+                                     Lang.bind(this, this._updateFocus));
+     },
+ 
+     _updateFocus: function(caller, event) {
+-        let component = event.source.get_component_iface();
++        let component;
++
++        if (typeof event.source.get_component_iface === "function") {
++            component = event.source.get_component_iface();
++        } else if (typeof event.source.get_component === "function") {
++            component = event.source.get_component();
++        }
++
+         if (!component || event.detail1 != 1)
+             return;
+         let extents;
+         try {
+             extents = component.get_extents(Atspi.CoordType.SCREEN);
+         } catch(e) {
+             log('Failed to read extents of focused component: ' + e.message);
+             return;
+         }
+ 
+         [this._xFocus, this._yFocus] = [extents.x + (extents.width / 2),
+                                         extents.y + (extents.height / 2)];
+         this._centerFromFocusPosition();
+     },
+ 
+     _updateCaret: function(caller, event) {
+-        let text = event.source.get_text_iface();
++        let text;
++
++        if (typeof event.source.get_text_iface === "function") {
++            text = event.source.get_text_iface();
++        } else if (typeof event.source.get_text === "function") {
++            text = event.source.get_text();
++        }
+         if (!text)
+             return;
+         let extents;
+         try {
+             extents = text.get_character_extents(text.get_caret_offset(), 0);
+         } catch(e) {
+             log('Failed to read extents of text caret: ' + e.message);
+             return;
+         }
+ 
+         [this._xCaret, this._yCaret] = [extents.x, extents.y];
+         this._centerFromCaretPosition();
+     },
+ 
+     /**
+      * setActive:
+      * @activate:   Boolean to show/hide the ZoomRegion.
+      */
+     setActive: function(activate) {
+         if (activate == this.isActive())
+             return;
+ 
+         if (activate) {
+             this._createActors();
+             if (this._isMouseOverRegion())
+                 this._magnifier.hideSystemCursor();
+             this._updateMagViewGeometry();
+             this._updateCloneGeometry();
+             this._updateMousePosition();
+         } else {
+-- 
+2.5.0
+
