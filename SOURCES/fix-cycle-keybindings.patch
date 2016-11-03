@@ -1,0 +1,602 @@
+From 9014bbdd2e8ccee83836fbb3795691a09d3c2d54 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 19 May 2016 14:41:24 +0200
+Subject: [PATCH 1/6] altTab: Take over cycle-windows/cycle-group keybindings
+
+The code to handle cycling through windows without showing a popup
+was removed from mutter a while ago, which left the corresponding
+keybindings mostly broken (i.e. they now only switch between two
+windows). With the various switch-foo keybindings handled by the
+shell, it is now easier to take over the cycle-foo keybindings as
+well.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=730739
+---
+ js/ui/altTab.js        | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ js/ui/windowManager.js | 34 ++++++++++++++++++++++
+ 2 files changed, 113 insertions(+)
+
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index 3850d89..0d569f8 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -355,6 +355,59 @@ const AppSwitcherPopup = new Lang.Class({
+     }
+ });
+ 
++const CyclerPopup = new Lang.Class({
++    Name: 'CyclerPopup',
++    Extends: SwitcherPopup.SwitcherPopup,
++    Abstract: true,
++
++    _init : function() {
++        this.parent();
++
++        this._items = this._getWindows();
++
++        if (this._items.length == 0)
++            return;
++
++        // We don't show an actual popup, so just provide what SwitcherPopup
++        // expects instead of inheriting from SwitcherList
++        this._switcherList = { actor: new St.Widget(),
++                               highlight: Lang.bind(this, this._highlightItem),
++                               connect: function() {} };
++    },
++
++    _highlightItem: function(index, justOutline) {
++        Main.activateWindow(this._items[index]);
++    },
++
++    _finish: function() {
++        this._highlightItem(this._selectedIndex);
++
++        this.parent();
++    }
++});
++
++
++const GroupCyclerPopup = new Lang.Class({
++    Name: 'GroupCyclerPopup',
++    Extends: CyclerPopup,
++
++    _getWindows: function() {
++        let app = Shell.WindowTracker.get_default().focus_app;
++        return app ? app.get_windows() : [];
++    },
++
++    _keyPressHandler: function(keysym, action) {
++        if (action == Meta.KeyBindingAction.CYCLE_GROUP)
++            this._select(this._next());
++        else if (action == Meta.KeyBindingAction.CYCLE_GROUP_BACKWARD)
++            this._select(this._previous());
++        else
++            return Clutter.EVENT_PROPAGATE;
++
++        return Clutter.EVENT_STOP;
++    }
++});
++
+ const WindowSwitcherPopup = new Lang.Class({
+     Name: 'WindowSwitcherPopup',
+     Extends: SwitcherPopup.SwitcherPopup,
+@@ -402,6 +455,32 @@ const WindowSwitcherPopup = new Lang.Class({
+     }
+ });
+ 
++const WindowCyclerPopup = new Lang.Class({
++    Name: 'WindowCyclerPopup',
++    Extends: CyclerPopup,
++
++    _init: function() {
++        this._settings = new Gio.Settings({ schema_id: 'org.gnome.shell.window-switcher' });
++        this.parent();
++    },
++
++    _getWindows: function() {
++        let workspace = this._settings.get_boolean('current-workspace-only') ? global.screen.get_active_workspace() : null;
++        return global.display.get_tab_list(Meta.TabList.NORMAL, workspace);
++    },
++
++    _keyPressHandler: function(keysym, action) {
++        if (action == Meta.KeyBindingAction.CYCLE_WINDOWS)
++            this._select(this._next());
++        else if (action == Meta.KeyBindingAction.CYCLE_WINDOWS_BACKWARD)
++            this._select(this._previous());
++        else
++            return Clutter.EVENT_PROPAGATE;
++
++        return Clutter.EVENT_STOP;
++    }
++});
++
+ const AppIcon = new Lang.Class({
+     Name: 'AppIcon',
+ 
+diff --git a/js/ui/windowManager.js b/js/ui/windowManager.js
+index e332552..b7dbc1f 100644
+--- a/js/ui/windowManager.js
++++ b/js/ui/windowManager.js
+@@ -763,6 +763,18 @@ const WindowManager = new Lang.Class({
+         this.setCustomKeybindingHandler('switch-windows-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+                                         Lang.bind(this, this._startWindowSwitcher));
++        this.setCustomKeybindingHandler('cycle-windows',
++                                        Shell.KeyBindingMode.NORMAL,
++                                        Lang.bind(this, this._startWindowCycler));
++        this.setCustomKeybindingHandler('cycle-windows-backward',
++                                        Shell.KeyBindingMode.NORMAL,
++                                        Lang.bind(this, this._startWindowCycler));
++        this.setCustomKeybindingHandler('cycle-group',
++                                        Shell.KeyBindingMode.NORMAL,
++                                        Lang.bind(this, this._startGroupCycler));
++        this.setCustomKeybindingHandler('cycle-group-backward',
++                                        Shell.KeyBindingMode.NORMAL,
++                                        Lang.bind(this, this._startGroupCycler));
+         this.setCustomKeybindingHandler('switch-panels',
+                                         Shell.KeyBindingMode.NORMAL |
+                                         Shell.KeyBindingMode.OVERVIEW |
+@@ -1407,6 +1419,28 @@ const WindowManager = new Lang.Class({
+             tabPopup.destroy();
+     },
+ 
++    _startWindowCycler : function(display, screen, window, binding) {
++        /* prevent a corner case where both popups show up at once */
++        if (this._workspaceSwitcherPopup != null)
++            this._workspaceSwitcherPopup.destroy();
++
++        let tabPopup = new AltTab.WindowCyclerPopup();
++
++        if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
++            tabPopup.destroy();
++    },
++
++    _startGroupCycler : function(display, screen, window, binding) {
++        /* prevent a corner case where both popups show up at once */
++        if (this._workspaceSwitcherPopup != null)
++            this._workspaceSwitcherPopup.destroy();
++
++        let tabPopup = new AltTab.GroupCyclerPopup();
++
++        if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
++            tabPopup.destroy();
++    },
++
+     _startA11ySwitcher : function(display, screen, window, binding) {
+         Main.ctrlAltTabManager.popup(binding.is_reversed(), binding.get_name(), binding.get_mask());
+     },
+-- 
+2.9.3
+
+
+From bfe5a9043e7a42108f39319c0966e0a6c3fd6d17 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 19 May 2016 16:36:46 +0200
+Subject: [PATCH 2/6] windowManager: Avoid code duplication
+
+The various switcher keybindings are handled identically, except for
+the popup that is shown; update the code to reflect that instead of
+duplicating the code again and again.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=730739
+---
+ js/ui/windowManager.js | 78 ++++++++++++++++++++++----------------------------
+ 1 file changed, 35 insertions(+), 43 deletions(-)
+
+diff --git a/js/ui/windowManager.js b/js/ui/windowManager.js
+index b7dbc1f..f228142 100644
+--- a/js/ui/windowManager.js
++++ b/js/ui/windowManager.js
+@@ -747,34 +747,34 @@ const WindowManager = new Lang.Class({
+                                         Lang.bind(this, this._showWorkspaceSwitcher));
+         this.setCustomKeybindingHandler('switch-applications',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startAppSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-group',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startAppSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-applications-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startAppSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-group-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startAppSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-windows',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startWindowSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-windows-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startWindowSwitcher));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('cycle-windows',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startWindowCycler));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('cycle-windows-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startWindowCycler));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('cycle-group',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startGroupCycler));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('cycle-group-backward',
+                                         Shell.KeyBindingMode.NORMAL,
+-                                        Lang.bind(this, this._startGroupCycler));
++                                        Lang.bind(this, this._startSwitcher));
+         this.setCustomKeybindingHandler('switch-panels',
+                                         Shell.KeyBindingMode.NORMAL |
+                                         Shell.KeyBindingMode.OVERVIEW |
+@@ -1397,45 +1397,37 @@ const WindowManager = new Lang.Class({
+         this._windowMenuManager.showWindowMenuForWindow(window, menu, rect);
+     },
+ 
+-    _startAppSwitcher : function(display, screen, window, binding) {
+-        /* prevent a corner case where both popups show up at once */
+-        if (this._workspaceSwitcherPopup != null)
+-            this._workspaceSwitcherPopup.destroy();
+-
+-        let tabPopup = new AltTab.AppSwitcherPopup();
+-
+-        if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
+-            tabPopup.destroy();
+-    },
+-
+-    _startWindowSwitcher : function(display, screen, window, binding) {
+-        /* prevent a corner case where both popups show up at once */
+-        if (this._workspaceSwitcherPopup != null)
+-            this._workspaceSwitcherPopup.destroy();
+-
+-        let tabPopup = new AltTab.WindowSwitcherPopup();
+-
+-        if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
+-            tabPopup.destroy();
+-    },
+-
+-    _startWindowCycler : function(display, screen, window, binding) {
+-        /* prevent a corner case where both popups show up at once */
+-        if (this._workspaceSwitcherPopup != null)
+-            this._workspaceSwitcherPopup.destroy();
+-
+-        let tabPopup = new AltTab.WindowCyclerPopup();
++    _startSwitcher: function(display, screen, window, binding) {
++        let constructor = null;
++        switch (binding.get_name()) {
++            case 'switch-applications':
++            case 'switch-applications-backward':
++            case 'switch-group':
++            case 'switch-group-backward':
++                constructor = AltTab.AppSwitcherPopup;
++                break;
++            case 'switch-windows':
++            case 'switch-windows-backward':
++                constructor = AltTab.WindowSwitcherPopup;
++                break;
++            case 'cycle-windows':
++            case 'cycle-windows-backward':
++                constructor = AltTab.WindowCyclerPopup;
++                break;
++            case 'cycle-group':
++            case 'cycle-group-backward':
++                constructor = AltTab.GroupCyclerPopup;
++                break;
++        }
+ 
+-        if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
+-            tabPopup.destroy();
+-    },
++        if (!constructor)
++            return;
+ 
+-    _startGroupCycler : function(display, screen, window, binding) {
+         /* prevent a corner case where both popups show up at once */
+         if (this._workspaceSwitcherPopup != null)
+             this._workspaceSwitcherPopup.destroy();
+ 
+-        let tabPopup = new AltTab.GroupCyclerPopup();
++        let tabPopup = new constructor();
+ 
+         if (!tabPopup.show(binding.is_reversed(), binding.get_name(), binding.get_mask()))
+             tabPopup.destroy();
+-- 
+2.9.3
+
+
+From 76169ed024198e8efbc876f6d50a21e71809b861 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 8 Sep 2016 16:05:06 +0200
+Subject: [PATCH 3/6] altTab: Don't mess up MRU order while cycling windows
+
+Commit bd6e7f14d17b reimplemented the cycle keybindings to
+fix cycling between more than two windows, but the approach
+of highlighting cycled windows by actually focusing them has
+the drawback that cycling messes up the MRU order of windows.
+To fix this, only change the window focus when the operation
+finishes, and use a dedicated actor that draws a border around
+a window clone for highlighting.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=771063
+---
+ data/theme/gnome-shell.css |  4 +++
+ js/ui/altTab.js            | 75 ++++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 77 insertions(+), 2 deletions(-)
+
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index f1e9a23..56ff92f 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -1891,6 +1891,10 @@ StScrollBar StButton#vhandle:active {
+     color: white;
+ }
+ 
++/* Window Cycler */
++.cycler-highlight {
++  border: 5px solid #215d9c; }
++
+ /* Workspace Switcher */
+ .workspace-switcher-group {
+     padding: 12px;
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index 0d569f8..c87baa2 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -355,6 +355,67 @@ const AppSwitcherPopup = new Lang.Class({
+     }
+ });
+ 
++const CyclerHighlight = new Lang.Class({
++    Name: 'CyclerHighlight',
++
++    _init: function() {
++        this._window = null;
++
++        this.actor = new St.Widget({ layout_manager: new Clutter.BinLayout() });
++
++        this._clone = new Clutter.Clone();
++        this.actor.add_actor(this._clone);
++
++        this._highlight = new St.Widget({ style_class: 'cycler-highlight' });
++        this.actor.add_actor(this._highlight);
++
++        let coordinate = Clutter.BindCoordinate.ALL;
++        let constraint = new Clutter.BindConstraint({ coordinate: coordinate });
++        this._clone.bind_property('source', constraint, 'source', 0);
++
++        this.actor.add_constraint(constraint);
++
++        this.actor.connect('notify::allocation',
++                           Lang.bind(this, this._onAllocationChanged));
++        this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
++    },
++
++    set window(w) {
++        if (this._window == w)
++            return;
++
++        this._window = w;
++
++        if (this._clone.source)
++            this._clone.source.show();
++
++        let windowActor = this._window ? this._window.get_compositor_private()
++                                       : null;
++
++        if (windowActor)
++            windowActor.hide();
++
++        this._clone.source = windowActor;
++    },
++
++    _onAllocationChanged: function() {
++        if (!this._window) {
++            this._highlight.set_size(0, 0);
++            this._highlight.hide();
++        } else {
++            let [x, y] = this.actor.allocation.get_origin();
++            let rect = this._window.get_frame_rect();
++            this._highlight.set_size(rect.width, rect.height);
++            this._highlight.set_position(rect.x - x, rect.y - y);
++            this._highlight.show();
++        }
++    },
++
++    _onDestroy: function() {
++        this.window = null;
++    }
++});
++
+ const CyclerPopup = new Lang.Class({
+     Name: 'CyclerPopup',
+     Extends: SwitcherPopup.SwitcherPopup,
+@@ -368,6 +429,9 @@ const CyclerPopup = new Lang.Class({
+         if (this._items.length == 0)
+             return;
+ 
++        this._highlight = new CyclerHighlight();
++        global.window_group.add_actor(this._highlight.actor);
++
+         // We don't show an actual popup, so just provide what SwitcherPopup
+         // expects instead of inheriting from SwitcherList
+         this._switcherList = { actor: new St.Widget(),
+@@ -376,11 +440,18 @@ const CyclerPopup = new Lang.Class({
+     },
+ 
+     _highlightItem: function(index, justOutline) {
+-        Main.activateWindow(this._items[index]);
++        this._highlight.window = this._items[index];
++        global.window_group.set_child_above_sibling(this._highlight.actor, null);
+     },
+ 
+     _finish: function() {
+-        this._highlightItem(this._selectedIndex);
++        Main.activateWindow(this._items[this._selectedIndex]);
++
++        this.parent();
++    },
++
++    _onDestroy: function() {
++        this._highlight.actor.destroy();
+ 
+         this.parent();
+     }
+-- 
+2.9.3
+
+
+From d5a87ea4b596a24905b0d1496b75ce5a26ac31fa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 13 Sep 2016 21:18:17 +0200
+Subject: [PATCH 4/6] altTab: Restore correct visibility when cycling windows
+
+Commit 3171819c improved window cycling by using a dedicated to clone
+for highlighting rather than activating all cycled windows. Original
+window actors are hidden while its clone is showing, and shown again
+afterwards, however the latter is wrong for actors that are not supposed
+to be visible (for example where the window is minimized, or on a different
+workspace). Fix this by properly syncing the actor's visibility instead
+of showing it unconditionally.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=771536
+---
+ js/ui/altTab.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index c87baa2..242b243 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -387,7 +387,7 @@ const CyclerHighlight = new Lang.Class({
+         this._window = w;
+ 
+         if (this._clone.source)
+-            this._clone.source.show();
++            this._clone.source.sync_visibility();
+ 
+         let windowActor = this._window ? this._window.get_compositor_private()
+                                        : null;
+-- 
+2.9.3
+
+
+From 14f381e5a86b586a713f95f7af017552a3d1733d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Wed, 14 Sep 2016 22:44:12 +0200
+Subject: [PATCH 5/6] altTab: Improve cycling to a window on another workspace
+
+Both 'cycle-group' and 'cycle-window' shortcuts allow cycling through
+windows on all workspaces. While this works, it looks quite broken
+since we started showing clones for highlighting: the selected window
+vanishes (when its clone is destroyed), then slides back in with its
+workspace. Instead, slide the selected window to its workspace like
+we do for the 'move-to-workspace-*' shortcuts.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=771536
+---
+ js/ui/altTab.js | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index 242b243..42d3b4a 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -445,7 +445,21 @@ const CyclerPopup = new Lang.Class({
+     },
+ 
+     _finish: function() {
+-        Main.activateWindow(this._items[this._selectedIndex]);
++        let window = this._items[this._selectedIndex];
++        let ws = window.get_workspace();
++        let activeWs = global.screen.get_active_workspace();
++
++        if (activeWs == ws) {
++            Main.activateWindow(window);
++        } else {
++            // If the selected window is on a different workspace, we don't
++            // want it to disappear, then slide in with the workspace; instead,
++            // always activate it on the active workspace ...
++            activeWs.activate_with_focus(window, global.get_current_time());
++
++            // ... then slide it over to the original workspace if necessary
++            Main.wm.actionMoveWindow(window, ws);
++        }
+ 
+         this.parent();
+     },
+-- 
+2.9.3
+
+
+From d5008a5bbed4a5b0511dc4c6b947ec04134a6370 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 15 Sep 2016 17:41:52 +0200
+Subject: [PATCH 6/6] altTab: Skip unminimize effect when cycling to a window
+
+Similar to windows on another workspace, selecting a minimized window
+doesn't look quite right - the selected window disappears, then animates
+back in. Fix this by adding support for skipping the next effect to the
+wm and use it to bypass the unminimize animation.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=771536
+---
+ js/ui/altTab.js        | 5 +++++
+ js/ui/windowManager.js | 9 +++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index 42d3b4a..41d9647 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -449,6 +449,11 @@ const CyclerPopup = new Lang.Class({
+         let ws = window.get_workspace();
+         let activeWs = global.screen.get_active_workspace();
+ 
++        if (window.minimized) {
++            Main.wm.skipNextEffect(window.get_compositor_private());
++            window.unminimize();
++        }
++
+         if (activeWs == ws) {
+             Main.activateWindow(window);
+         } else {
+diff --git a/js/ui/windowManager.js b/js/ui/windowManager.js
+index f228142..237ae1d 100644
+--- a/js/ui/windowManager.js
++++ b/js/ui/windowManager.js
+@@ -595,6 +595,8 @@ const WindowManager = new Lang.Class({
+ 
+         this._dimmedWindows = [];
+ 
++        this._skippedActors = [];
++
+         this._allowedKeybindings = {};
+ 
+         this._switchData = null;
+@@ -875,6 +877,10 @@ const WindowManager = new Lang.Class({
+         this._workspaceTracker.keepWorkspaceAlive(workspace, duration);
+     },
+ 
++    skipNextEffect: function(actor) {
++        this._skippedActors.push(actor);
++    },
++
+     setCustomKeybindingHandler: function(name, modes, handler) {
+         if (Meta.keybindings_set_custom_handler(name, handler))
+             this.allowKeybinding(name, modes);
+@@ -901,6 +907,9 @@ const WindowManager = new Lang.Class({
+     },
+ 
+     _shouldAnimateActor: function(actor, types) {
++        if (this._removeEffect(this._skippedActors, actor))
++            return false;
++
+         if (!this._shouldAnimate())
+             return false;
+ 
+-- 
+2.9.3
+

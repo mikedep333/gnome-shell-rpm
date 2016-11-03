@@ -1,0 +1,69 @@
+From bda1257c8299045fa4d4aa09e05f70e404cacc56 Mon Sep 17 00:00:00 2001
+From: Victor Toso <victortoso@redhat.com>
+Date: Thu, 12 May 2016 09:25:49 +0200
+Subject: [PATCH] ScreenShield: set LockedHint property from systemd
+
+Logind recently got support for a hint property in Session Object to
+inform if session is Locked or not. It is up to desktop environments
+to keep this property up to date.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=764773
+---
+ js/misc/loginManager.js |  3 +++
+ js/ui/screenShield.js   | 10 +++++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/js/misc/loginManager.js b/js/misc/loginManager.js
+index b4ed4a6..af0586e 100644
+--- a/js/misc/loginManager.js
++++ b/js/misc/loginManager.js
+@@ -40,6 +40,9 @@ const SystemdLoginSessionIface = '<node> \
+ <signal name="Lock" /> \
+ <signal name="Unlock" /> \
+ <property name="Active" type="b" access="read" /> \
++<method name="SetLockedHint"> \
++    <arg type="b" direction="in"/> \
++</method> \
+ </interface> \
+ </node>';
+ 
+diff --git a/js/ui/screenShield.js b/js/ui/screenShield.js
+index 3a84468..973604a 100644
+--- a/js/ui/screenShield.js
++++ b/js/ui/screenShield.js
+@@ -1125,9 +1125,13 @@ const ScreenShield = new Lang.Class({
+         let prevIsActive = this._isActive;
+         this._isActive = true;
+ 
+-        if (prevIsActive != this._isActive)
++        if (prevIsActive != this._isActive) {
+             this.emit('active-changed');
+ 
++            if (this._loginSession)
++                this._loginSession.SetLockedHintRemote(this._isActive);
++        }
++
+         if (this._aboutToSuspend)
+             this._uninhibitSuspend();
+ 
+@@ -1226,6 +1230,8 @@ const ScreenShield = new Lang.Class({
+             this._activationTime = 0;
+             this._isActive = false;
+             this.emit('active-changed');
++            if (this._loginSession)
++                this._loginSession.SetLockedHintRemote(this._isActive);
+             return;
+         }
+ 
+@@ -1272,6 +1278,8 @@ const ScreenShield = new Lang.Class({
+         this._isLocked = false;
+         this.emit('active-changed');
+         this.emit('locked-changed');
++        if (this._loginSession)
++            this._loginSession.SetLockedHintRemote(this._isActive);
+         global.set_runtime_state(LOCKED_STATE_STR, null);
+     },
+ 
+-- 
+2.7.4
+

@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.14.4
-Release:        37%{?dist}
+Release:        53%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -18,6 +18,12 @@ Patch3: gnome-shell-favourite-apps-terminal.patch
 
 Patch10: support-headless-mode.patch
 Patch11: fix-menu-ornament-oddities.patch
+Patch12: 0001-st-button-Don-t-rely-on-hover-to-accept-clicks.patch
+Patch13: 0001-theme-Use-font-relative-sizes-for-menu-widths.patch
+Patch14: 0001-altTab-Don-t-error-out-if-we-don-t-have-windows-for-.patch
+Patch15: fix-cycle-keybindings.patch
+
+Patch20: gnome-shell-3.14.4-EL7.3_translations.patch
 
 Patch50: fix-background-leaks.patch
 
@@ -28,10 +34,15 @@ Patch80: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
 Patch81: 0002-extensions-Add-a-SESSION_MODE-extension-type.patch
 Patch82: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
 Patch83: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
+Patch84: 0001-ScreenShield-set-LockedHint-property-from-systemd.patch
 
 Patch90: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
 Patch91: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
 Patch92: 0001-gdm-honor-timed-login-delay-even-if-animations-disab.patch
+Patch93: 0001-network-Summarize-sections-with-too-many-devices.patch
+Patch94: 0001-network-Always-show-primary-icon-when-connected.patch
+Patch95: 0001-app-Add-a-construct-only-app-info-property.patch
+Patch96: 0001-Don-t-crash-on-accesses-to-stale-window-backed-apps.patch
 
 Patch99: login-screen-backport.patch
 Patch100: 0001-screenShield-unblank-when-inserting-smartcard.patch
@@ -41,12 +52,18 @@ Patch102: disable-unlock-entry-until-question.patch
 Patch110: 0001-shell_dbus_acquire_name-Don-t-leak-error.patch
 Patch111: 0002-shell_dbus_acquire_name-Don-t-leak-the-result.patch
 Patch112: 0003-Check-error-of-g_dbus_proxy_new_sync-call.patch
+Patch113: allow-timed-login-with-no-user-list.patch
+
+Patch114: video-memory-purge.patch
+
+# https://bugzilla.gnome.org/show_bug.cgi?id=761566
+Patch120: fix-maximized-windows-flickering-to-the-wrong-struts.patch
 
 %define clutter_version 1.15.90
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.41.0
 %define gjs_version 1.39.0
-%define mutter_version 3.14.1
+%define mutter_version 3.14.4-31
 %define eds_version 3.5.3
 %define gnome_desktop_version 3.7.90
 %define json_glib_version 0.13.2
@@ -54,6 +71,7 @@ Patch112: 0003-Check-error-of-g_dbus_proxy_new_sync-call.patch
 %define caribou_version 0.4.8
 %define libcroco_version 0.6.8
 %define telepathy_logger_version 0.2.6
+%define gstreamer_version 1.4.5
 
 ## Needed when we re-autogen
 BuildRequires:  autoconf >= 2.53
@@ -79,7 +97,7 @@ BuildRequires:  startup-notification-devel
 BuildRequires:  telepathy-glib-devel
 BuildRequires:  telepathy-logger-devel >= %{telepathy_logger_version}
 # for screencast recorder functionality
-BuildRequires:  gstreamer1-devel
+BuildRequires:  gstreamer1-devel >= %{gstreamer_version}
 BuildRequires:  gtk3-devel
 BuildRequires:  intltool
 BuildRequires:  libcanberra-devel
@@ -118,6 +136,7 @@ Requires:       gnome-desktop3%{?_isa} >= %{gnome_desktop_version}
 Requires:       gsettings-desktop-schemas%{?_isa} >= %{gsettings_desktop_schemas_version}
 Requires:       libcroco%{?_isa} >= %{libcroco_version}
 Requires:       telepathy-logger%{?_isa} >= %{telepathy_logger_version}
+Requires:       gstreamer1%{?_isa} >= %{gstreamer_version}
 # needed for schemas
 Requires:       at-spi2-atk%{?_isa}
 # needed for on-screen keyboard
@@ -155,6 +174,12 @@ be used only by extensions.gnome.org.
 
 %patch10 -p1 -b .support-headless-start
 %patch11 -p1 -b .fix-menu-ornament-oddities
+%patch12 -p1 -b .fix-st-button-clicks
+%patch13 -p1 -b .use-font-relative-menu-widths
+%patch14 -p1 -b .fix-windowless-apps-in-switcher
+%patch15 -p1 -b .fix-cycle-keybindings
+
+%patch20 -p1 -b .update-translations
 
 %patch50 -p1 -b .fix-background-leaks
 
@@ -166,10 +191,15 @@ be used only by extensions.gnome.org.
 %patch81 -p1
 %patch82 -p1 -b .fix-magnifier-spew
 %patch83 -p1 -b .extension-update-notification
+%patch84 -p1 -b .set-locked-hint
 
 %patch90 -p1 -b .panel-add-an-icon-to-the-ActivitiesButton
 %patch91 -p1 -b .change-fallback-app-name
 %patch92 -p1 -b .honor-timed-login-delay-even-if-animations-disabled
+%patch93 -p1 -b .summarize-network-device-sections
+%patch94 -p1 -b .always-show-network-icon-when-connected
+%patch95 -p1 -b .allow-contructing-app-from-info
+%patch96 -p1 -b .dont-crash-on-accesses-to-stale-window-backed-apps
 
 %patch99 -p1 -b .login-screen-backport
 %patch100 -p1 -b .unblank-when-inserting-smartcard
@@ -179,6 +209,11 @@ be used only by extensions.gnome.org.
 %patch110 -p1 -b .dont-leak
 %patch111 -p1 -b .dont-leak-more
 %patch112 -p1 -b .clean-exit
+%patch113 -p1 -b .allow-timed-login-with-no-user-list
+
+%patch114 -p1 -b .video-memory-purge
+
+%patch120 -p1 -b .wrong-struts
 
 %build
 (if ! test -x configure; then NOCONFIGURE=1 ./autogen.sh; fi;
@@ -244,6 +279,80 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Fri Sep 09 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-53
+- Improve cycle keybindings
+  Resolves: #1306670
+
+* Mon Jul 18 2016 Rui Matos <rmatos@redhat.com> - 3.14.4-52
+- Require a mutter version that provides all the new APIs
+  Related: rhbz#1330488
+
+* Tue Jul 12 2016 Ray Strode <rstrode@redhat.com> - 3.14.4-51
+- Backport patch to fix crash at start up
+  Resolves: #1354560
+  Related: #1353249
+
+* Fri Jul 08 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-50
+- Allow constructing ShellApp from AppInfo
+  Related: #1353249
+
+* Thu Jun 30 2016 Owen Taylor <otaylor@redhat.com> - 3.14.4-49
+- Fix bug where maximized windows would flicker to the wrong size when
+  restarting the shell (on stereo enable or otherwise)
+  Resolves: #1306802
+
+* Wed Jun 29 2016 Rui Matos <rmatos@redhat.com> - 3.14.4-48
+- Handle video memory purge errors
+  Resolves: #1330488
+
+* Fri Jun 24 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-47
+- Update translations
+  Resolves: #1272377
+
+* Tue May 31 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-46
+- Fix cycle keybindings
+  Resolves: #1306670
+
+* Fri May 27 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-45
+- Set logind's LockedHint when locked
+  Resolves: #1329803
+
+* Thu May 19 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-44
+- Always show network icon when connected
+  Resolves: #1100812
+
+* Fri May 13 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-43
+- Fix visibility issue in last patch
+  Resolves: #1186954
+
+* Fri May 13 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-42
+- Summarize network device sections with too many devices
+  Resolves: #1186954
+
+* Fri May 13 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-41
+- Fix windowless apps in switcher
+  Resolves: #1329306
+
+* Tue Apr 19 2016 Ray Strode <rstrode@redhat.com> - 3.14.4-40
+- Allow timed login with no user list
+  Resolves: #1301263
+
+* Thu Mar 31 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-39
+- Include translation updates
+  Related: #1272377
+
+* Fri Mar 04 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-38
+- Use font-relative menu widths
+  Related: #1257146
+
+* Fri Mar 04 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-37
+- Fix clicks on window-list items after dismissing context menu
+  Related: #1268689
+
+* Fri Mar 04 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-37
+- Request minimum gstreamer1 version
+  Related: #1290446
+
 * Tue Oct 13 2015 Ray Strode <rstrode@redhat.com> 3.14.4-37
 - Fix Username: entry when disable-user-list is on
   Related: #1262999

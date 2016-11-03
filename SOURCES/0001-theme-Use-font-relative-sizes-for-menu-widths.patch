@@ -1,0 +1,48 @@
+From a474ae94b4dbe9d5fa21c9b0f6ef028af8a97680 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 4 Sep 2015 18:54:44 +0200
+Subject: [PATCH] theme: Use font-relative sizes for menu widths
+
+For menus, it makes more sense to pick a width that fits a reasonable amount
+of content rather than a fixed amount of screen estate, so use font-relative
+sizes instead of pixel values.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=754581
+---
+ data/theme/gnome-shell.css | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index 97634b1..f1e9a23 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -169,7 +169,7 @@ StScrollBar StButton#vhandle:active {
+ 
+ 
+ .popup-menu {
+-    min-width: 200px;
++    min-width: 15em;
+ }
+ 
+ .popup-menu-arrow {
+@@ -733,7 +733,7 @@ StScrollBar StButton#vhandle:active {
+ }
+ 
+ .aggregate-menu {
+-    width: 360px;
++    width: 27em;
+ }
+ 
+ .aggregate-menu .popup-menu-icon {
+@@ -1455,7 +1455,7 @@ StScrollBar StButton#vhandle:active {
+ }
+ 
+ .events-table {
+-    width: 320px;
++    width: 24em;
+     spacing-columns: 6pt;
+     padding: 0 1.4em;
+ }
+-- 
+2.7.2
+

@@ -1,0 +1,40 @@
+From b9b12009cfa24d77d33927c3d011036f4591d37c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 19 May 2016 18:22:02 +0200
+Subject: [PATCH] network: Always show primary icon when connected
+
+---
+ js/ui/status/network.js | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/js/ui/status/network.js b/js/ui/status/network.js
+index 9f4faa4..0a345eb 100644
+--- a/js/ui/status/network.js
++++ b/js/ui/status/network.js
+@@ -2069,13 +2069,20 @@ const NMApplet = new Lang.Class({
+     },
+ 
+     _updateIcon: function() {
+-        if (!this._client.networking_enabled || !this._mainConnection) {
++        if (!this._client.networking_enabled) {
+             this._primaryIndicator.visible = false;
+         } else {
+-            let dev = this._mainConnection._primaryDevice;
+-            this._primaryIndicator.visible = (dev != null);
++            let dev = null;
++            if (this._mainConnection)
++                dev = this._mainConnection._primaryDevice;
++
++            let state = this._client.get_state();
++            let connected = state == NetworkManager.State.CONNECTED_GLOBAL;
++            this._primaryIndicator.visible = (dev != null) || connected;
+             if (dev)
+                 this._primaryIndicator.icon_name = dev.getIndicatorIcon();
++            else if (connected)
++                this._primaryIndicator.icon_name = 'network-wired-symbolic';
+         }
+ 
+         this._vpnIndicator.icon_name = this._vpnSection.getIndicatorIcon();
+-- 
+2.7.4
+

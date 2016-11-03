@@ -1,0 +1,30 @@
+From 02d385ba830fa43cb06877f6bfb63ea4aaa1d508 Mon Sep 17 00:00:00 2001
+From: Rui Matos <tiagomatos@gmail.com>
+Date: Thu, 8 Oct 2015 18:17:54 +0200
+Subject: [PATCH] altTab: Don't error out if we don't have windows for an app
+
+We are currently erroring out when the tab chain doesn't contain at
+least one window for an app which might happen for windows that don't
+take focus like xeyes. This leaves us in a state where we can't show
+the switcher at all. Let's just ignore these apps instead of looking
+broken.
+---
+ js/ui/altTab.js | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/js/ui/altTab.js b/js/ui/altTab.js
+index cee81b0..3850d89 100644
+--- a/js/ui/altTab.js
++++ b/js/ui/altTab.js
+@@ -449,8 +449,6 @@ const AppSwitcher = new Lang.Class({
+             });
+             if (appIcon.cachedWindows.length > 0)
+                 this._addIcon(appIcon);
+-            else if (workspace == null)
+-                throw new Error('%s appears to be running, but doesn\'t have any windows'.format(appIcon.app.get_name()));
+         }
+ 
+         this._curApp = -1;
+-- 
+2.7.4
+
