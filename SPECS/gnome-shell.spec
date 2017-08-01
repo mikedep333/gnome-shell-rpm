@@ -1,73 +1,62 @@
 Name:           gnome-shell
-Version:        3.14.4
-Release:        53%{?dist}
+Version:        3.22.3
+Release:        17%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
 License:        GPLv2+
 Provides:       desktop-notification-daemon
-URL:            http://live.gnome.org/GnomeShell
+URL:            https://wiki.gnome.org/Projects/GnomeShell
 #VCS:           git:git://git.gnome.org/gnome-shell
-Source0:        http://download.gnome.org/sources/gnome-shell/3.14/%{name}-%{version}.tar.xz
-Source1:	org.gnome.shell.gschema.override
+Source0:        http://download.gnome.org/sources/gnome-shell/3.22/%{name}-%{version}.tar.xz
+Source1:        org.gnome.shell.gschema.override
 
 # Replace Epiphany with Firefox in the default favourite apps list
 Patch1: gnome-shell-favourite-apps-firefox.patch
 Patch2: gnome-shell-favourite-apps-yelp.patch
 Patch3: gnome-shell-favourite-apps-terminal.patch
 
-Patch10: support-headless-mode.patch
-Patch11: fix-menu-ornament-oddities.patch
-Patch12: 0001-st-button-Don-t-rely-on-hover-to-accept-clicks.patch
-Patch13: 0001-theme-Use-font-relative-sizes-for-menu-widths.patch
-Patch14: 0001-altTab-Don-t-error-out-if-we-don-t-have-windows-for-.patch
-Patch15: fix-cycle-keybindings.patch
+# GDM/Lock stuff
+Patch10: 0001-gdm-honor-timed-login-delay-even-if-animations-disab.patch
+Patch11: 0001-gdm-use-password-authentication-if-all-schemes-are-d.patch
+Patch12: 0001-screenShield-unblank-when-inserting-smartcard.patch
+Patch13: enforce-smartcard-at-unlock.patch
+Patch14: disable-unlock-entry-until-question.patch
+Patch15: allow-timed-login-with-no-user-list.patch
+Patch16: 0001-gdm-Handle-absence-of-Fprint.Manager-service.patch
+Patch17: respect-lockscreen-lockdown.patch
+Patch18: 0001-gdmUtil-Fix-auth-prompt-drawing-over-user-list.patch
+Patch19: 0001-data-install-process-working.svg-to-filesystem.patch
+Patch20: 0001-authPrompt-allow-empty-response-to-PAM-messages.patch
+Patch21: 0001-objectManager-handle-proxies-coming-and-going.patch
+Patch22: 0002-objectManager-handle-object-manager-sending-empty-ar.patch
+Patch23: 0001-loginDialog-make-info-messages-themed.patch
 
-Patch20: gnome-shell-3.14.4-EL7.3_translations.patch
+# Misc.
+Patch30: support-headless-mode.patch
+Patch31: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
+Patch32: 0001-extensions-Add-a-SESSION_MODE-extension-type.patch
+Patch33: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
+Patch34: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
+Patch35: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
+Patch36: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
+Patch37: 0001-network-Summarize-sections-with-too-many-devices.patch
+Patch38: 0001-windowMenu-Bring-back-workspaces-submenu-for-static-.patch
+Patch39: keep-vpn-list-sorted.patch
+Patch40: 0001-network-Close-Wifi-selection-dialog-when-appropriate.patch
+Patch41: 0001-calendar-server-Remove-unused-variables-and-function.patch
+Patch42: 0001-st-Add-missing-NULL-check.patch
+patch43: 0001-network-Fix-initial-visibility-of-summary-item.patch
 
-Patch50: fix-background-leaks.patch
-
-Patch60: drop-gsystem-dependency.patch
-Patch61: 0001-messageTray-Emit-signal-when-notifications-are-enabl.patch
-Patch62: pass-mode-parameter-with-accelerators.patch
-Patch80: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
-Patch81: 0002-extensions-Add-a-SESSION_MODE-extension-type.patch
-Patch82: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
-Patch83: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
-Patch84: 0001-ScreenShield-set-LockedHint-property-from-systemd.patch
-
-Patch90: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
-Patch91: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
-Patch92: 0001-gdm-honor-timed-login-delay-even-if-animations-disab.patch
-Patch93: 0001-network-Summarize-sections-with-too-many-devices.patch
-Patch94: 0001-network-Always-show-primary-icon-when-connected.patch
-Patch95: 0001-app-Add-a-construct-only-app-info-property.patch
-Patch96: 0001-Don-t-crash-on-accesses-to-stale-window-backed-apps.patch
-
-Patch99: login-screen-backport.patch
-Patch100: 0001-screenShield-unblank-when-inserting-smartcard.patch
-Patch101: enforce-smartcard-at-unlock.patch
-Patch102: disable-unlock-entry-until-question.patch
-
-Patch110: 0001-shell_dbus_acquire_name-Don-t-leak-error.patch
-Patch111: 0002-shell_dbus_acquire_name-Don-t-leak-the-result.patch
-Patch112: 0003-Check-error-of-g_dbus_proxy_new_sync-call.patch
-Patch113: allow-timed-login-with-no-user-list.patch
-
-Patch114: video-memory-purge.patch
-
-# https://bugzilla.gnome.org/show_bug.cgi?id=761566
-Patch120: fix-maximized-windows-flickering-to-the-wrong-struts.patch
-
-%define clutter_version 1.15.90
 %define gnome_bluetooth_version 1:3.9.0
-%define gobject_introspection_version 1.41.0
+%define gobject_introspection_version 1.45.4
 %define gjs_version 1.39.0
-%define mutter_version 3.14.4-31
-%define eds_version 3.5.3
+%define mutter_version 3.22.1
+%define gtk3_version 3.15.0
+%define eds_version 3.13.90
 %define gnome_desktop_version 3.7.90
 %define json_glib_version 0.13.2
-%define gsettings_desktop_schemas_version 3.11.4
+%define gsettings_desktop_schemas_version 3.21.3
 %define caribou_version 0.4.8
 %define libcroco_version 0.6.8
 %define telepathy_logger_version 0.2.6
@@ -76,10 +65,12 @@ Patch120: fix-maximized-windows-flickering-to-the-wrong-struts.patch
 ## Needed when we re-autogen
 BuildRequires:  autoconf >= 2.53
 BuildRequires:  automake >= 1.10
+BuildRequires:  gettext-devel
+BuildRequires:  git
 BuildRequires:  gnome-common >= 2.2.0
 BuildRequires:  libtool >= 1.4.3
 BuildRequires:  caribou-devel >= %{caribou_version}
-BuildRequires:  clutter-devel >= %{clutter_version}
+BuildRequires:  chrpath
 BuildRequires:  dbus-glib-devel
 BuildRequires:  desktop-file-utils
 BuildRequires:  evolution-data-server-devel >= %{eds_version}
@@ -98,10 +89,15 @@ BuildRequires:  telepathy-glib-devel
 BuildRequires:  telepathy-logger-devel >= %{telepathy_logger_version}
 # for screencast recorder functionality
 BuildRequires:  gstreamer1-devel >= %{gstreamer_version}
-BuildRequires:  gtk3-devel
-BuildRequires:  intltool
+BuildRequires:  gtk3-devel >= %{gtk3_version}
+BuildRequires:  gettext >= 0.19.6
 BuildRequires:  libcanberra-devel
 BuildRequires:  libcroco-devel >= %{libcroco_version}
+%if 0%{?rhel}
+BuildRequires:  python
+%else
+BuildRequires:  python3
+%endif
 
 # for barriers
 BuildRequires:  libXfixes-devel >= 5.0
@@ -123,6 +119,7 @@ Requires:       gnome-desktop3%{?_isa} >= %{gnome_desktop_version}
 # from the command line
 Requires:       gobject-introspection%{?_isa} >= %{gobject_introspection_version}
 Requires:       gjs%{?_isa} >= %{gjs_version}
+Requires:       gtk3%{?_isa} >= %{gtk3_version}
 # needed for loading SVG's via gdk-pixbuf
 Requires:       librsvg2%{?_isa}
 # needed as it is now split from Clutter
@@ -144,10 +141,14 @@ Requires:       caribou%{?_isa} >= %{caribou_version}
 # needed for the user menu
 Requires:       accountsservice-libs%{?_isa}
 Requires:       gdm-libs%{?_isa}
-Requires:       clutter%{?_isa} >= %{clutter_version}
 # needed for settings items in menus
-Requires:	    control-center
-
+Requires:       control-center
+# needed by some utilities
+%if 0%{?rhel}
+Requires:       python%{_isa}
+%else
+Requires:       python3%{_isa}
+%endif
 
 %description
 GNOME Shell provides core user interface functions for the GNOME 3 desktop,
@@ -167,53 +168,14 @@ Gnome Shell for live extension enabling and disabling. It can
 be used only by extensions.gnome.org.
 
 %prep
-%setup -q
-%patch1 -p1 -b .firefox
-%patch2 -p1 -b .yelp
-%patch3 -p1 -b .terminal
+%autosetup -S git
 
-%patch10 -p1 -b .support-headless-start
-%patch11 -p1 -b .fix-menu-ornament-oddities
-%patch12 -p1 -b .fix-st-button-clicks
-%patch13 -p1 -b .use-font-relative-menu-widths
-%patch14 -p1 -b .fix-windowless-apps-in-switcher
-%patch15 -p1 -b .fix-cycle-keybindings
-
-%patch20 -p1 -b .update-translations
-
-%patch50 -p1 -b .fix-background-leaks
-
-%patch60 -p1 -b .drop-gsystem-dependency
-%patch61 -p1 -b .fix-enable-notifications
-%patch62 -p1 -b .pass-mode-parameter-with-accelerators
-
-%patch80 -p1
-%patch81 -p1
-%patch82 -p1 -b .fix-magnifier-spew
-%patch83 -p1 -b .extension-update-notification
-%patch84 -p1 -b .set-locked-hint
-
-%patch90 -p1 -b .panel-add-an-icon-to-the-ActivitiesButton
-%patch91 -p1 -b .change-fallback-app-name
-%patch92 -p1 -b .honor-timed-login-delay-even-if-animations-disabled
-%patch93 -p1 -b .summarize-network-device-sections
-%patch94 -p1 -b .always-show-network-icon-when-connected
-%patch95 -p1 -b .allow-contructing-app-from-info
-%patch96 -p1 -b .dont-crash-on-accesses-to-stale-window-backed-apps
-
-%patch99 -p1 -b .login-screen-backport
-%patch100 -p1 -b .unblank-when-inserting-smartcard
-%patch101 -p1 -b .enforce-smartcard-at-unlock-time
-%patch102 -p1 -b .disable-unlock-entry-until-question
-
-%patch110 -p1 -b .dont-leak
-%patch111 -p1 -b .dont-leak-more
-%patch112 -p1 -b .clean-exit
-%patch113 -p1 -b .allow-timed-login-with-no-user-list
-
-%patch114 -p1 -b .video-memory-purge
-
-%patch120 -p1 -b .wrong-struts
+%if 0%{?rhel}
+# Use Python 2
+sed -i -e 's|/usr/bin/python3|/usr/bin/python|' tools/check-for-missing.py
+sed -i -e 's/AM_PATH_PYTHON(\[3\])/AM_PATH_PYTHON([2.5])/' configure.ac
+autoreconf -fi
+%endif
 
 %build
 (if ! test -x configure; then NOCONFIGURE=1 ./autogen.sh; fi;
@@ -221,18 +183,22 @@ be used only by extensions.gnome.org.
 make V=1 %{?_smp_mflags}
 
 %install
-make install DESTDIR=$RPM_BUILD_ROOT
+%make_install
 
 rm -rf %{buildroot}/%{_libdir}/mozilla/plugins/*.la
 
-desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell.desktop
-desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell-extension-prefs.desktop
-desktop-file-validate %{buildroot}%{_datadir}/applications/evolution-calendar.desktop
-rm -f %{buildroot}%{_datadir}/applications/gnome-shell-wayland.desktop
+# Create empty directories where other packages can drop extensions
+mkdir -p %{buildroot}%{_datadir}/gnome-shell/extensions
+mkdir -p %{buildroot}%{_datadir}/gnome-shell/search-providers
 
 cp %{SOURCE1} %{buildroot}/%{_datadir}/glib-2.0/schemas
 
 %find_lang %{name}
+
+%check
+desktop-file-validate %{buildroot}%{_datadir}/applications/org.gnome.Shell.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell-extension-prefs.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/evolution-calendar.desktop
 
 %preun
 glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null ||:
@@ -241,19 +207,22 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null ||:
 
 %files -f %{name}.lang
-%doc COPYING README
+%license COPYING
+%doc README
 %{_bindir}/gnome-shell
 %{_bindir}/gnome-shell-extension-tool
 %{_bindir}/gnome-shell-perf-tool
 %{_bindir}/gnome-shell-extension-prefs
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_datadir}/glib-2.0/schemas/*.override
-%{_datadir}/applications/gnome-shell.desktop
+%{_datadir}/applications/org.gnome.Shell.desktop
 %{_datadir}/applications/gnome-shell-extension-prefs.desktop
 %{_datadir}/applications/evolution-calendar.desktop
 %{_datadir}/applications/org.gnome.Shell.PortalHelper.desktop
 %{_datadir}/gnome-control-center/keybindings/50-gnome-shell-system.xml
-%{_datadir}/gnome-shell/
+%{_datadir}/gnome-shell
+%{_datadir}/gnome-shell/theme
+%{_datadir}/gnome-shell/theme/*.svg
 %{_datadir}/dbus-1/services/org.gnome.Shell.CalendarServer.service
 %{_datadir}/dbus-1/services/org.gnome.Shell.HotplugSniffer.service
 %{_datadir}/dbus-1/services/org.gnome.Shell.PortalHelper.service
@@ -261,6 +230,10 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_datadir}/dbus-1/interfaces/org.gnome.Shell.Screenshot.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.ShellSearchProvider.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.ShellSearchProvider2.xml
+# Co own directory instead of pulling in xdg-desktop-portal - we
+# are providing a backend to the portal, not depending on it
+%dir %{_datadir}/xdg-desktop-portal/portals/
+%{_datadir}/xdg-desktop-portal/portals/gnome-shell.portal
 %{_libdir}/gnome-shell/
 %{_libexecdir}/gnome-shell-calendar-server
 %{_libexecdir}/gnome-shell-perf-helper
@@ -279,6 +252,79 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Mon Jun 26 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-17
+- Fix PAM info messages in unlock screen
+  Related: #1449359
+
+* Wed Jun 14 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-16
+- Address race with g-s-d startup
+  Related: #1450176
+
+* Wed Jun 14 2017 Ray Strode <rstrode@redhat.com> 3.22.3-15
+- Allow PAM modules to ask questions that require empty answers
+  Resolves: #1448503
+
+* Thu Jun 08 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-14
+- fix unlock after upgrade
+  Related: #1448786
+- switch from setup to autosetup -S git for easier patch maintenance
+
+* Thu Jun 08 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-13
+- Drop gnome-session-xsession dependency again
+- Resolves: #1449246
+
+* Wed Jun 07 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-12
+- Fix escape after password failure
+  Resolves: #1446759
+
+* Tue Jun 06 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-11
+- Correct typo in timed login patch
+  Related: #1446762
+
+* Wed May 31 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-10
+- Fix initial visibility of network summary items
+- Resolves: #1435376
+
+* Fri Apr 28 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-9
+- Re-add requirements dropped in the rebase
+- Resolves: #1386959
+
+* Wed Mar 22 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-8
+- Fix some coverity warnings
+- Resolves: #1386959
+
+* Tue Mar 21 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-7
+- Respect lockscreen lockdown
+- Resolves: #1414898
+
+* Tue Mar 21 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-7
+- Fix previous patch after re-testing
+- Resolves: #1259538
+
+* Tue Mar 14 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-6
+- Handle missing fprint service
+- Resolves: #1259538
+
+* Tue Mar 14 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-5
+- Close Wifi selection dialog on screen lock
+- Resolves: #1379468
+
+* Tue Mar 14 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-4
+- Keep VPN list sorted
+- Resolves: #1404663
+
+* Tue Mar 14 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-3
+- Bring back workspaces submenu for static workspaces
+- Resolves: #1367319
+
+* Thu Mar 09 2017 Florian Müllner <fmuellner@redhat.com> - 3.22.3-2
+- Re-add downstream patches
+- Resolves: #1386959
+
+* Thu Feb 16 2017 Kalev Lember <klember@redhat.com> - 3.22.3-1
+- Update to 3.22.3
+- Resolves: #1386959
+
 * Fri Sep 09 2016 Florian Müllner <fmuellner@redhat.com> - 3.14.4-53
 - Improve cycle keybindings
   Resolves: #1306670

@@ -1,4 +1,4 @@
-From 04ef143e61be7445bc643298cd1cbd99f9c57383 Mon Sep 17 00:00:00 2001
+From 8a2efe0e5c239a18ad38bba966d73c992eed9dc7 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
 Date: Mon, 21 Sep 2015 20:18:12 +0200
 Subject: [PATCH] extensionSystem: Notify about extension issues on update
@@ -8,7 +8,7 @@ Subject: [PATCH] extensionSystem: Notify about extension issues on update
  1 file changed, 32 insertions(+)
 
 diff --git a/js/ui/extensionSystem.js b/js/ui/extensionSystem.js
-index a69308d..b5e189c 100644
+index 810fa1577..fe0d8117f 100644
 --- a/js/ui/extensionSystem.js
 +++ b/js/ui/extensionSystem.js
 @@ -7,6 +7,7 @@ const GLib = imports.gi.GLib;
@@ -65,5 +65,5 @@ index a69308d..b5e189c 100644
  
  function enableAllExtensions() {
 -- 
-2.5.0
+2.12.0
 

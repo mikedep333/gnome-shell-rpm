@@ -1,0 +1,60 @@
+From daa05f09d2a79d160c5e355cf26e4c73d7b0f01b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 14 Mar 2017 21:02:51 +0100
+Subject: [PATCH] gdm: Handle absence of Fprint.Manager service
+
+We rely on the service to detect whether a fingerprint reader is
+present. It is fine to not support fingerprint authentication
+when the service is missing, but currently we don't handle this
+case at all and end up with a non-functional login screen.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=780063
+---
+ js/gdm/fingerprint.js | 8 +++++++-
+ js/gdm/util.js        | 5 +++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/js/gdm/fingerprint.js b/js/gdm/fingerprint.js
+index bce0bc6a7..2aeb377ce 100644
+--- a/js/gdm/fingerprint.js
++++ b/js/gdm/fingerprint.js
+@@ -23,6 +23,12 @@ function FprintManager() {
+                                    g_object_path: '/net/reactivated/Fprint/Manager',
+                                    g_flags: (Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES) });
+ 
+-    self.init(null);
++    try {
++        self.init(null);
++    } catch(e) {
++        log('Failed to connect to Fprint service: ' + e.message);
++        return null;
++    }
++
+     return self;
+ }
+diff --git a/js/gdm/util.js b/js/gdm/util.js
+index 9517150f0..0048c85bd 100644
+--- a/js/gdm/util.js
++++ b/js/gdm/util.js
+@@ -132,7 +132,7 @@ const ShellUserVerifier = new Lang.Class({
+         this._settings.connect('changed',
+                                Lang.bind(this, this._updateDefaultService));
+ 
+-        this._fprintManager = new Fprint.FprintManager();
++        this._fprintManager = Fprint.FprintManager();
+         this._smartcardManager = SmartcardManager.getSmartcardManager();
+ 
+         // We check for smartcards right away, since an inserted smartcard
+@@ -294,7 +294,8 @@ const ShellUserVerifier = new Lang.Class({
+     _checkForFingerprintReader: function() {
+         this._haveFingerprintReader = false;
+ 
+-        if (!this._settings.get_boolean(FINGERPRINT_AUTHENTICATION_KEY)) {
++        if (!this._settings.get_boolean(FINGERPRINT_AUTHENTICATION_KEY) ||
++            this._fprintManager == null) {
+             this._updateDefaultService();
+             return;
+         }
+-- 
+2.12.0
+

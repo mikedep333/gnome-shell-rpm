@@ -1,66 +1,33 @@
-From 261497c9581472621320072c4f243bcc33d75726 Mon Sep 17 00:00:00 2001
-From: Rui Matos <tiagomatos@gmail.com>
-Date: Wed, 10 Jun 2015 16:05:41 +0200
-Subject: [PATCH 1/2] AllView: prevent accessing a NULL effect
-
-In some cases we might be allocated a size such that
-this._grid.topPadding and this._grid.bottomPadding are both 0 which
-means that the ScrollView fade effect gets removed. In that case don't
-try to access the effect since it will be NULL.
-
-https://bugzilla.gnome.org/show_bug.cgi?id=750714
----
- js/ui/appDisplay.js | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/js/ui/appDisplay.js b/js/ui/appDisplay.js
-index ae40f3e..45e5c71 100644
---- a/js/ui/appDisplay.js
-+++ b/js/ui/appDisplay.js
-@@ -738,7 +738,8 @@ const AllView = new Lang.Class({
-         let fadeOffset = Math.min(this._grid.topPadding,
-                                   this._grid.bottomPadding);
-         this._scrollView.update_fade_effect(fadeOffset, 0);
--        this._scrollView.get_effect('fade').fade_edges = true;
-+        if (fadeOffset > 0)
-+            this._scrollView.get_effect('fade').fade_edges = true;
- 
-         if (this._availWidth != availWidth || this._availHeight != availHeight || oldNPages != this._grid.nPages()) {
-             this._adjustment.value = 0;
--- 
-2.5.0
-
-
-From 2076a96ee5ad7669e050de035aa10c33af76d810 Mon Sep 17 00:00:00 2001
+From 191f8b08f0235b300fab68384abf4ecec2845a03 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
 Date: Thu, 16 Jul 2015 15:15:41 +0200
-Subject: [PATCH 2/2] layout: Handle the no-monitor case
+Subject: [PATCH] layout: Handle the no-monitor case
 
 ---
- js/ui/layout.js             | 66 ++++++++++++++++++++++++++++++++-------------
- js/ui/lookingGlass.js       |  4 +++
- js/ui/messageTray.js        |  6 +++--
- js/ui/panel.js              |  5 +++-
+ js/ui/layout.js             | 50 +++++++++++++++++++++++++++++++++------------
+ js/ui/lookingGlass.js       |  4 ++++
+ js/ui/messageTray.js        |  3 ++-
+ js/ui/panel.js              |  5 ++++-
  js/ui/workspaceThumbnail.js |  3 ++-
- 5 files changed, 62 insertions(+), 22 deletions(-)
+ 5 files changed, 49 insertions(+), 16 deletions(-)
 
 diff --git a/js/ui/layout.js b/js/ui/layout.js
-index e9aab13..d124705 100644
+index aaf9da536..9e41d779e 100644
 --- a/js/ui/layout.js
 +++ b/js/ui/layout.js
-@@ -106,7 +106,10 @@ const MonitorConstraint = new Lang.Class({
-             return;
+@@ -136,7 +136,10 @@ const MonitorConstraint = new Lang.Class({
+             index = Math.min(this._index, Main.layoutManager.monitors.length - 1);
  
-         let monitor;
--        if (this._primary) {
+         let rect;
+-        if (this._workArea) {
 +        if (Main.layoutManager.monitors.length == 0) {
-+            monitor = new Meta.Rectangle({ width: global.screen_width,
-+                                           height: global.screen_height });
-+        } else if (this._primary) {
-             monitor = Main.layoutManager.primaryMonitor;
++            rect = new Meta.Rectangle({ width: global.screen_width,
++                                        height: global.screen_height });
++        } else if (this._workArea) {
+             let ws = global.screen.get_workspace_by_index(0);
+             rect = ws.get_work_area_for_monitor(index);
          } else {
-             let index = Math.min(this._index, Main.layoutManager.monitors.length - 1);
-@@ -297,7 +300,9 @@ const LayoutManager = new Lang.Class({
+@@ -323,7 +326,9 @@ const LayoutManager = new Lang.Class({
          for (let i = 0; i < nMonitors; i++)
              this.monitors.push(new Monitor(i, screen.get_monitor_geometry(i)));
  
@@ -71,7 +38,7 @@ index e9aab13..d124705 100644
              this.primaryIndex = this.bottomIndex = 0;
          } else {
              // If there are monitors below the primary, then we need
-@@ -311,8 +316,10 @@ const LayoutManager = new Lang.Class({
+@@ -337,8 +342,10 @@ const LayoutManager = new Lang.Class({
                  }
              }
          }
@@ -84,7 +51,7 @@ index e9aab13..d124705 100644
      },
  
      _updateHotCorners: function() {
-@@ -423,6 +430,10 @@ const LayoutManager = new Lang.Class({
+@@ -449,6 +456,10 @@ const LayoutManager = new Lang.Class({
      },
  
      _updateKeyboardBox: function() {
@@ -95,7 +62,7 @@ index e9aab13..d124705 100644
          this.keyboardBox.set_position(this.keyboardMonitor.x,
                                        this.keyboardMonitor.y + this.keyboardMonitor.height);
          this.keyboardBox.set_size(this.keyboardMonitor.width, -1);
-@@ -432,17 +443,27 @@ const LayoutManager = new Lang.Class({
+@@ -458,8 +469,13 @@ const LayoutManager = new Lang.Class({
          this.screenShieldGroup.set_position(0, 0);
          this.screenShieldGroup.set_size(global.screen_width, global.screen_height);
  
@@ -109,26 +76,9 @@ index e9aab13..d124705 100644
 +            this.panelBox.set_size(global.screen_width, -1);
 +        }
  
-         if (this.keyboardIndex < 0)
-             this.keyboardIndex = this.primaryIndex;
-         else
-             this._updateKeyboardBox();
- 
--        this.trayBox.set_position(this.bottomMonitor.x,
--                                  this.bottomMonitor.y + this.bottomMonitor.height);
--        this.trayBox.set_size(this.bottomMonitor.width, -1);
-+        if (this.bottomMonitor != null) {
-+            this.trayBox.set_position(this.bottomMonitor.x,
-+                                      this.bottomMonitor.y + this.bottomMonitor.height);
-+            this.trayBox.set_size(this.bottomMonitor.width, -1);
-+         } else {
-+            this.trayBox.set_position(0, global.screen_height);
-+            this.trayBox.set_size(global.screen_width, -1);
-+        }
+         this.keyboardIndex = this.primaryIndex;
      },
- 
-     _panelBoxChanged: function() {
-@@ -461,9 +482,8 @@ const LayoutManager = new Lang.Class({
+@@ -480,9 +496,8 @@ const LayoutManager = new Lang.Class({
              this._rightPanelBarrier = null;
          }
  
@@ -140,26 +90,7 @@ index e9aab13..d124705 100644
              this._rightPanelBarrier = new Meta.Barrier({ display: global.display,
                                                           x1: primary.x + primary.width, y1: primary.y,
                                                           x2: primary.x + primary.width, y2: primary.y + this.panelBox.height,
-@@ -486,14 +506,16 @@ const LayoutManager = new Lang.Class({
-     },
- 
-     _updateTrayBarrier: function() {
--        let monitor = this.bottomMonitor;
--
-         if (this._trayBarrier) {
-             this._trayPressure.removeBarrier(this._trayBarrier);
-             this._trayBarrier.destroy();
-             this._trayBarrier = null;
-         }
- 
-+        let monitor = this.bottomMonitor;
-+        if (!monitor)
-+            return;
-+
-         this._trayBarrier = new Meta.Barrier({ display: global.display,
-                                                x1: monitor.x, x2: monitor.x + monitor.width,
-                                                y1: monitor.y + monitor.height, y2: monitor.y + monitor.height,
-@@ -544,7 +566,7 @@ const LayoutManager = new Lang.Class({
+@@ -522,7 +537,7 @@ const LayoutManager = new Lang.Class({
      },
  
      get keyboardMonitor() {
@@ -168,7 +99,7 @@ index e9aab13..d124705 100644
      },
  
      get focusIndex() {
-@@ -558,7 +580,7 @@ const LayoutManager = new Lang.Class({
+@@ -536,7 +551,7 @@ const LayoutManager = new Lang.Class({
      },
  
      get focusMonitor() {
@@ -177,16 +108,18 @@ index e9aab13..d124705 100644
      },
  
      set keyboardIndex(v) {
-@@ -613,7 +635,7 @@ const LayoutManager = new Lang.Class({
+@@ -591,7 +606,9 @@ const LayoutManager = new Lang.Class({
                                                reactive: true });
          this.addChrome(this._coverPane);
  
 -        if (Meta.is_restart()) {
-+        if (Meta.is_restart() || global.screen.get_n_monitors() == 0) {
-             // On restart, we don't do an animation
-         } else if (Main.sessionMode.isGreeter) {
-             this.panelBox.translation_y = -this.panelBox.height;
-@@ -654,7 +676,7 @@ const LayoutManager = new Lang.Class({
++        if (global.screen.get_n_monitors() == 0) {
++            // Don't do anything
++        } else if (Meta.is_restart()) {
+             // On restart, we don't do an animation. Force an update of the
+             // regions immediately so that maximized windows restore to the
+             // right size taking struts into account.
+@@ -634,7 +651,7 @@ const LayoutManager = new Lang.Class({
      },
  
      _startupAnimation: function() {
@@ -195,17 +128,16 @@ index e9aab13..d124705 100644
              this._startupAnimationComplete();
          else if (Main.sessionMode.isGreeter)
              this._startupAnimationGreeter();
-@@ -885,6 +907,9 @@ const LayoutManager = new Lang.Class({
-         global.window_group.visible = windowsVisible;
-         global.top_window_group.visible = windowsVisible;
- 
+@@ -863,6 +880,8 @@ const LayoutManager = new Lang.Class({
+     _updateActorVisibility: function(actorData) {
+         if (!actorData.trackFullscreen)
+             return;
 +        if (global.screen.get_n_monitors() == 0)
 +            return;
-+
-         for (let i = 0; i < this._trackedActors.length; i++) {
-             let actorData = this._trackedActors[i], visible;
-             if (!actorData.trackFullscreen)
-@@ -901,6 +926,9 @@ const LayoutManager = new Lang.Class({
+ 
+         let monitor = this.findMonitorForActor(actorData.actor);
+         actorData.actor.visible = !(global.window_group.visible &&
+@@ -880,6 +899,9 @@ const LayoutManager = new Lang.Class({
      },
  
      getWorkAreaForMonitor: function(monitorIndex) {
@@ -215,17 +147,17 @@ index e9aab13..d124705 100644
          // Assume that all workspaces will have the same
          // struts and pick the first one.
          let ws = global.screen.get_workspace_by_index(0);
-@@ -1008,6 +1036,8 @@ const LayoutManager = new Lang.Class({
-                 // we don't create a strut for it at all.
+@@ -985,6 +1007,8 @@ const LayoutManager = new Lang.Class({
+ 
+                 let monitor = this.findMonitorForActor(actorData.actor);
                  let side;
-                 let primary = this.primaryMonitor;
-+                if (!primary)
-+                    continue;
-                 if (x1 <= primary.x && x2 >= primary.x + primary.width) {
-                     if (y1 <= primary.y)
++                if (!monitor)
++                  continue;
+                 if (x1 <= monitor.x && x2 >= monitor.x + monitor.width) {
+                     if (y1 <= monitor.y)
                          side = Meta.Side.TOP;
 diff --git a/js/ui/lookingGlass.js b/js/ui/lookingGlass.js
-index eb837d8..d5e3353 100644
+index 7dd8bd1c0..abca97600 100644
 --- a/js/ui/lookingGlass.js
 +++ b/js/ui/lookingGlass.js
 @@ -538,6 +538,8 @@ const Inspector = new Lang.Class({
@@ -247,34 +179,24 @@ index eb837d8..d5e3353 100644
          let availableHeight = primary.height - Main.layoutManager.keyboardBox.height;
          let myHeight = Math.min(primary.height * 0.7, availableHeight * 0.9);
 diff --git a/js/ui/messageTray.js b/js/ui/messageTray.js
-index f1ce7f2..0be69bc 100644
+index 4f1ab7fea..16b9ef6bc 100644
 --- a/js/ui/messageTray.js
 +++ b/js/ui/messageTray.js
-@@ -1995,7 +1995,8 @@ const MessageTray = new Lang.Class({
- 
-     _checkTrayDwell: function(x, y) {
-         let monitor = Main.layoutManager.bottomMonitor;
--        let shouldDwell = (x >= monitor.x && x <= monitor.x + monitor.width &&
-+        let shouldDwell = monitor &&
-+                          (x >= monitor.x && x <= monitor.x + monitor.width &&
-                            y == monitor.y + monitor.height - 1);
-         if (shouldDwell) {
-             // We only set up dwell timeout when the user is not hovering over the tray
-@@ -2434,7 +2435,8 @@ const MessageTray = new Lang.Class({
-             let shouldShowNotification = (hasNotifications && this._trayState == State.HIDDEN && !this._traySummoned);
+@@ -1224,7 +1224,8 @@ const MessageTray = new Lang.Class({
+         if (this._notificationState == State.HIDDEN) {
              let nextNotification = this._notificationQueue[0] || null;
-             if (shouldShowNotification && nextNotification) {
+             if (hasNotifications && nextNotification) {
 -                let limited = this._busy || Main.layoutManager.bottomMonitor.inFullscreen;
 +                let bottomMonitor = Main.layoutManager.bottomMonitor;
 +                let limited = this._busy || (bottomMonitor && bottomMonitor.inFullscreen);
                  let showNextNotification = (!limited || nextNotification.forFeedback || nextNotification.urgency == Urgency.CRITICAL);
-                 if (showNextNotification) {
-                     let len = this._notificationQueue.length;
+                 if (showNextNotification)
+                     this._showNotification();
 diff --git a/js/ui/panel.js b/js/ui/panel.js
-index dd04601..fedc7cc 100644
+index eededfae1..d07bbaa7b 100644
 --- a/js/ui/panel.js
 +++ b/js/ui/panel.js
-@@ -931,7 +931,10 @@ const Panel = new Lang.Class({
+@@ -820,7 +820,10 @@ const Panel = new Lang.Class({
  
      _getPreferredWidth: function(actor, forHeight, alloc) {
          alloc.min_size = -1;
@@ -287,10 +209,10 @@ index dd04601..fedc7cc 100644
  
      _getPreferredHeight: function(actor, forWidth, alloc) {
 diff --git a/js/ui/workspaceThumbnail.js b/js/ui/workspaceThumbnail.js
-index 3adc327..bb1c8fe 100644
+index 980ffd665..d19ce1f6a 100644
 --- a/js/ui/workspaceThumbnail.js
 +++ b/js/ui/workspaceThumbnail.js
-@@ -264,7 +264,8 @@ const WorkspaceThumbnail = new Lang.Class({
+@@ -275,7 +275,8 @@ const WorkspaceThumbnail = new Lang.Class({
          this._createBackground();
  
          let monitor = Main.layoutManager.primaryMonitor;
@@ -301,5 +223,5 @@ index 3adc327..bb1c8fe 100644
          let windows = global.get_window_actors().filter(Lang.bind(this, function(actor) {
              let win = actor.meta_window;
 -- 
-2.5.0
+2.12.0
 

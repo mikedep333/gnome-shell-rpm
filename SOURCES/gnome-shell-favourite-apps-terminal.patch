@@ -1,12 +1,13 @@
-diff -up gnome-shell-3.8.4/data/org.gnome.shell.gschema.xml.in.in.terminal gnome-shell-3.8.4/data/org.gnome.shell.gschema.xml.in.in
---- gnome-shell-3.8.4/data/org.gnome.shell.gschema.xml.in.in.terminal	2013-12-04 19:55:59.264274478 -0500
-+++ gnome-shell-3.8.4/data/org.gnome.shell.gschema.xml.in.in	2013-12-04 19:56:51.813151886 -0500
-@@ -32,7 +32,7 @@
-       </_description>
+diff --git a/data/org.gnome.shell.gschema.xml.in b/data/org.gnome.shell.gschema.xml.in
+index 1e35ca3..95b8c52 100644
+--- a/data/org.gnome.shell.gschema.xml.in
++++ b/data/org.gnome.shell.gschema.xml.in
+@@ -31,7 +31,7 @@
+       </description>
      </key>
      <key name="favorite-apps" type="as">
 -      <default>[ 'firefox.desktop', 'evolution.desktop', 'rhythmbox.desktop', 'shotwell.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'yelp.desktop' ]</default>
 +      <default>[ 'firefox.desktop', 'evolution.desktop', 'rhythmbox.desktop', 'shotwell.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'yelp.desktop', 'gnome-terminal.desktop' ]</default>
-       <_summary>List of desktop file IDs for favorite applications</_summary>
-       <_description>
+       <summary>List of desktop file IDs for favorite applications</summary>
+       <description>
          The applications corresponding to these identifiers

@@ -1,0 +1,95 @@
+From ec8c1bbcb97699e51a2aa0306a7811c911f1a930 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Mon, 13 Feb 2017 16:02:02 +0100
+Subject: [PATCH 1/2] ui: Allow moving menu items to a certain position
+
+This function is a helper to simplify keeping menu items ordered when
+their order is updated on the fly (e.g. network connections being
+renamed).
+
+https://bugzilla.gnome.org/show_bug.cgi?id=778686
+---
+ js/ui/popupMenu.js | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/js/ui/popupMenu.js b/js/ui/popupMenu.js
+index 52a58d6b8..011a95ac0 100644
+--- a/js/ui/popupMenu.js
++++ b/js/ui/popupMenu.js
+@@ -605,6 +605,24 @@ const PopupMenuBase = new Lang.Class({
+         menuItem.actor.show();
+     },
+ 
++    moveMenuItem: function(menuItem, position) {
++        let items = this._getMenuItems();
++        let i = 0;
++
++        while (i < items.length && position > 0) {
++                if (items[i] != menuItem)
++                        position--;
++                i++;
++        }
++
++        if (i < items.length) {
++                if (items[i] != menuItem)
++                        this.box.set_child_below_sibling(menuItem.actor, items[i].actor);
++        } else {
++                this.box.set_child_above_sibling(menuItem.actor, null);
++        }
++    },
++
+     addMenuItem: function(menuItem, position) {
+         let before_item = null;
+         if (position == undefined) {
+-- 
+2.12.0
+
+
+From 40bb56b24c95289ee4bfc121cf9405d303a22609 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Mon, 13 Feb 2017 14:52:23 +0100
+Subject: [PATCH 2/2] network: Ensure the connection list is sorted after
+ rename
+
+Items were inserted correctly but the synchronisation was lost if the
+name of a connection was changed. Simply making sure the position is
+correct after a connection is updated fixes the issue.
+
+Reported-by: Oliver Haessler <ohaessle@redhat.com>
+
+https://bugzilla.gnome.org/show_bug.cgi?id=778686
+---
+ js/ui/status/network.js | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/status/network.js b/js/ui/status/network.js
+index c386bff1d..11ca16014 100644
+--- a/js/ui/status/network.js
++++ b/js/ui/status/network.js
+@@ -299,11 +299,22 @@ const NMConnectionSection = new Lang.Class({
+ 
+         let item = this._connectionItems.get(connection.get_uuid());
+         if (item)
+-            item.updateForConnection(connection);
++            this._updateForConnection(item, connection);
+         else
+             this._addConnection(connection);
+     },
+ 
++    _updateForConnection: function(item, connection) {
++        let pos = this._connections.indexOf(connection);
++
++        this._connections.splice(pos, 1);
++        pos = Util.insertSorted(this._connections, connection, Lang.bind(this, this._connectionSortFunction));
++        this._labelSection.moveMenuItem(item.labelItem, pos);
++        this._radioSection.moveMenuItem(item.radioItem, pos);
++
++        item.updateForConnection(connection);
++    },
++
+     _addConnection: function(connection) {
+         let item = this._makeConnectionItem(connection);
+         if (!item)
+-- 
+2.12.0
+

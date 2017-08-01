@@ -1,4 +1,4 @@
-From 266607d2b5ce7bb74f5954897460261af21b9ff0 Mon Sep 17 00:00:00 2001
+From 03f5d81342e096ab331308c99ac4b1c15dd5a448 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 18 Aug 2015 12:02:17 -0400
 Subject: [PATCH] gdm: honor timed login delay even if animations disabled
@@ -14,42 +14,14 @@ has noticed the user is idle for 5 seconds.
 This commit addresses that problem by initiating timed login and the
 animation from a main loop timeout, instead of using the tweener api.
 ---
- js/gdm/loginDialog.js | 38 ++++++++++++++++++++++++++++----------
- src/gvc               |  2 +-
- 2 files changed, 29 insertions(+), 11 deletions(-)
+ js/gdm/loginDialog.js | 37 +++++++++++++++++++++++++++----------
+ 1 file changed, 27 insertions(+), 10 deletions(-)
 
 diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
-index a51ffd5..4b4d232 100644
+index 0b6c0b50a..45eca18f7 100644
 --- a/js/gdm/loginDialog.js
 +++ b/js/gdm/loginDialog.js
-@@ -80,74 +80,90 @@ const UserListItem = new Lang.Class({
-                                                  scale_x: 0 });
-         layout.add(this._timedLoginIndicator);
- 
-         this.actor.connect('clicked', Lang.bind(this, this._onClicked));
-         this._onUserChanged();
-     },
- 
-     _onUserChanged: function() {
-         this._updateLoggedIn();
-     },
- 
-     _updateLoggedIn: function() {
-         if (this.user.is_logged_in())
-             this.actor.add_style_pseudo_class('logged-in');
-         else
-             this.actor.remove_style_pseudo_class('logged-in');
-     },
- 
-     _onDestroy: function() {
-         this._user.disconnect(this._userChangedId);
-     },
- 
-     _onClicked: function() {
-         this.emit('activate');
-     },
- 
-     showTimedLoginIndicator: function(time) {
+@@ -107,20 +107,34 @@ const UserListItem = new Lang.Class({
          let hold = new Batch.Hold();
  
          this.hideTimedLoginIndicator();
@@ -71,9 +43,7 @@ index a51ffd5..4b4d232 100644
 +                                                          let currentTime = GLib.get_monotonic_time();
 +                                                          let elapsedTime = (currentTime - startTime) / GLib.USEC_PER_SEC;
 +                                                          this._timedLoginIndicator.scale_x = elapsedTime / time;
-+                                                          log("elasped time: " + elapsedTime + " time: " + time);
 +                                                          if (elapsedTime >= time) {
-+                                                              log("releasing hold");
 +                                                              this._timedLoginTimeoutId = 0;
 +                                                              hold.release();
 +                                                              return GLib.SOURCE_REMOVE;
@@ -96,30 +66,6 @@ index a51ffd5..4b4d232 100644
          this._timedLoginIndicator.scale_x = 0.;
      }
  });
- Signals.addSignalMethods(UserListItem.prototype);
- 
- const UserList = new Lang.Class({
-     Name: 'UserList',
- 
-     _init: function() {
-         this.actor = new St.ScrollView({ style_class: 'login-dialog-user-list-view'});
-         this.actor.set_policy(Gtk.PolicyType.NEVER,
-                               Gtk.PolicyType.AUTOMATIC);
- 
-         this._box = new St.BoxLayout({ vertical: true,
-                                        style_class: 'login-dialog-user-list',
-                                        pseudo_class: 'expanded' });
- 
-         this.actor.add_actor(this._box);
-         this._items = {};
- 
-         this.actor.connect('key-focus-in', Lang.bind(this, this._moveFocusToItems));
-     },
- 
-     _moveFocusToItems: function() {
-         let hasItems = Object.keys(this._items).length > 0;
- 
-         if (!hasItems)
-             return;
- 
-         if (global.stage.get_key_focus() != this.actor)
+-- 
+2.12.0
+

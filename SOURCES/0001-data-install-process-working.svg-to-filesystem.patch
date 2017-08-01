@@ -1,0 +1,82 @@
+From 62377987c188fd48967c0956c36f36d8f77b0a24 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Thu, 8 Jun 2017 12:04:31 -0400
+Subject: [PATCH] data: install process-working.svg to filesystem
+
+This helps prevent unlock failure on inplace upgrades between
+7.3 and 7.4
+---
+ data/Makefile.am | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/data/Makefile.am b/data/Makefile.am
+index 2eee47903..e2b806d61 100644
+--- a/data/Makefile.am
++++ b/data/Makefile.am
+@@ -45,60 +45,63 @@ introspection_DATA =				\
+ 	$(NULL)
+ 
+ theme_sources = 						\
+ 	theme/gnome-shell-high-contrast.scss			\
+ 	theme/gnome-shell.scss					\
+ 	theme/gnome-shell-sass/_colors.scss			\
+ 	theme/gnome-shell-sass/_common.scss			\
+ 	theme/gnome-shell-sass/_drawing.scss			\
+ 	theme/gnome-shell-sass/_high-contrast-colors.scss	\
+ 	$(NULL)
+ 
+ dist_theme_files =						\
+ 	$(theme_sources)					\
+ 	theme/Gemfile						\
+ 	theme/HACKING						\
+ 	theme/README						\
+ 	theme/gnome-shell-sass/COPYING				\
+ 	theme/gnome-shell-sass/HACKING				\
+ 	theme/gnome-shell-sass/NEWS				\
+ 	theme/gnome-shell-sass/README				\
+ 	theme/gnome-shell-sass/gnome-shell-sass.doap		\
+ 	theme/parse-sass.sh					\
+ 	$(NULL)
+ 
+ %.css: %.scss $(theme_sources)
+ 	@if test -n "$(SASS)"; then \
+ 		if $(AM_V_P); then PS4= set -x; else echo "  GEN      $@"; fi; \
+ 		$(SASS) --sourcemap=none -f -q --update $<; \
+ 	fi
+ 
++themedir = $(pkgdatadir)/theme
++dist_theme_DATA = theme/process-working.svg
++
+ resource_files = $(shell $(GLIB_COMPILE_RESOURCES) --sourcedir=$(srcdir)/theme --generate-dependencies $(srcdir)/gnome-shell-theme.gresource.xml)
+ gnome-shell-theme.gresource: gnome-shell-theme.gresource.xml $(resource_files)
+ 	$(AM_V_GEN) $(GLIB_COMPILE_RESOURCES) --target=$@ --sourcedir=$(srcdir)/theme $<
+ resourcedir = $(pkgdatadir)
+ resource_DATA = gnome-shell-theme.gresource
+ 
+ backgrounddir = $(pkgdatadir)
+ background_DATA = perf-background.xml
+ 
+ perf-background.xml: perf-background.xml.in
+ 	$(AM_V_GEN) sed -e "s|@datadir[@]|$(datadir)|" \
+ 	    $< > $@ || rm $@
+ 
+ keysdir = @GNOME_KEYBINDINGS_KEYSDIR@
+ keys_DATA = 50-gnome-shell-system.xml
+ 
+ gsettings_SCHEMAS = org.gnome.shell.gschema.xml
+ 
+ %.gschema.xml: %.gschema.xml.in Makefile
+ 	$(AM_V_GEN) sed -e 's|@GETTEXT_PACKAGE[@]|$(GETTEXT_PACKAGE)|g' \
+ 	$< > $@ || rm $@
+ 
+ @GSETTINGS_RULES@
+ 
+ # We need to compile schemas at make time
+ # to run from source tree
+ gschemas.compiled: $(gsettings_SCHEMAS:.xml=.valid)
+ 	$(AM_V_GEN) $(GLIB_COMPILE_SCHEMAS) --targetdir=. .
+ 
+ all-local: gschemas.compiled
+-- 
+2.13.0
+

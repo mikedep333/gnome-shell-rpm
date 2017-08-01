@@ -1,0 +1,38 @@
+From 465e059a0c8a68301f8071a1cc14c817d2337012 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 14 Mar 2017 20:32:50 +0100
+Subject: [PATCH] network: Close Wifi selection dialog when appropriate
+
+Currently when the wifi selection dialog is open when the screen lock is
+activated, the dialog remains visible above the shield. This is clearly
+broken, so close the dialog automatically on session mode changes if the
+mode doesn't allow settings (as changing the access point is arguably a
+user setting).
+
+https://bugzilla.gnome.org/show_bug.cgi?id=780054
+---
+ js/ui/status/network.js | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/js/ui/status/network.js b/js/ui/status/network.js
+index 11ca16014..842f6be6a 100644
+--- a/js/ui/status/network.js
++++ b/js/ui/status/network.js
+@@ -769,6 +769,14 @@ const NMWirelessDialog = new Lang.Class({
+         this._scanTimeoutId = Mainloop.timeout_add_seconds(15, Lang.bind(this, this._onScanTimeout));
+         GLib.Source.set_name_by_id(this._scanTimeoutId, '[gnome-shell] this._onScanTimeout');
+         this._onScanTimeout();
++
++        let id = Main.sessionMode.connect('updated', () => {
++            if (Main.sessionMode.allowSettings)
++                return;
++
++            Main.sessionMode.disconnect(id);
++            this.close();
++        });
+     },
+ 
+     destroy: function() {
+-- 
+2.12.0
+

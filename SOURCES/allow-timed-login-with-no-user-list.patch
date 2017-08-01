@@ -1,43 +1,56 @@
-From a08995020936b425a98970b686ff5f9169d8968b Mon Sep 17 00:00:00 2001
+From f3f5643134c317546c88ff11b974f1a04ad780ff Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 19 Apr 2016 13:12:46 -0400
 Subject: [PATCH] loginDialog: allow timed login with disabled user list
 
 ---
- data/theme/gnome-shell.css |  5 +++++
- js/gdm/authPrompt.js       | 41 +++++++++++++++++++++++++++++++++++++++++
- js/gdm/loginDialog.js      | 29 ++++++++++++++++++++++++++---
- 3 files changed, 72 insertions(+), 3 deletions(-)
+ data/theme/gnome-shell-high-contrast.css |  3 +++
+ data/theme/gnome-shell.css               |  3 +++
+ js/gdm/authPrompt.js                     | 41 ++++++++++++++++++++++++++++++++
+ js/gdm/loginDialog.js                    | 29 +++++++++++++++++++---
+ 4 files changed, 73 insertions(+), 3 deletions(-)
 
+diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
+index 3ce5278e1..0325fea87 100644
+--- a/data/theme/gnome-shell-high-contrast.css
++++ b/data/theme/gnome-shell-high-contrast.css
+@@ -1691,6 +1691,9 @@ StScrollBar {
+   padding-bottom: 12px;
+   spacing: 8px;
+   width: 23em; }
++  .login-dialog-prompt-layout .login-dialog-timed-login-indicator {
++    height: 2px;
++    background-color: #8b8b8b; }
+ 
+ .login-dialog-prompt-label {
+   color: #bebeb6;
 diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
-index f1e9a23..97f8b0a 100644
+index 342bebe9d..e2a442ecb 100644
 --- a/data/theme/gnome-shell.css
 +++ b/data/theme/gnome-shell.css
-@@ -2455,6 +2455,11 @@ StScrollBar StButton#vhandle:active {
-     background-size: contain;
- }
- 
-+.login-dialog-prompt-layout .login-dialog-timed-login-indicator {
+@@ -1691,6 +1691,9 @@ StScrollBar {
+   padding-bottom: 12px;
+   spacing: 8px;
+   width: 23em; }
++  .login-dialog-prompt-layout .login-dialog-timed-login-indicator {
 +    height: 2px;
-+    background-color: #8b8b8b;
-+}
-+
- .login-dialog-user-list-item .login-dialog-timed-login-indicator {
-     background-color: rgba(0,0,0,0.0);
-     height: 2px;
++    background-color: #8b8b8b; }
+ 
+ .login-dialog-prompt-label {
+   color: #bebeb6;
 diff --git a/js/gdm/authPrompt.js b/js/gdm/authPrompt.js
-index fe80519..4370721 100644
+index 6327633d9..ae03a5b49 100644
 --- a/js/gdm/authPrompt.js
 +++ b/js/gdm/authPrompt.js
-@@ -1,6 +1,7 @@
- // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
+@@ -2,6 +2,7 @@
  
  const Clutter = imports.gi.Clutter;
+ const Gio = imports.gi.Gio;
 +const GLib = imports.gi.GLib;
  const Lang = imports.lang;
  const Signals = imports.signals;
  const St = imports.gi.St;
-@@ -117,6 +118,11 @@ const AuthPrompt = new Lang.Class({
+@@ -118,6 +119,11 @@ const AuthPrompt = new Lang.Class({
  
          this._entry.grab_key_focus();
  
@@ -49,7 +62,7 @@ index fe80519..4370721 100644
          this._message = new St.Label({ opacity: 0,
                                         styleClass: 'login-dialog-message' });
          this._message.clutter_text.line_wrap = true;
-@@ -141,6 +147,41 @@ const AuthPrompt = new Lang.Class({
+@@ -142,6 +148,41 @@ const AuthPrompt = new Lang.Class({
          this._defaultButtonWell.add_child(this._spinner.actor);
      },
  
@@ -92,20 +105,20 @@ index fe80519..4370721 100644
          if (this._preemptiveAnswerWatchId) {
              this._idleMonitor.remove_watch(this._preemptiveAnswerWatchId);
 diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
-index b577520..a370e1c 100644
+index 45eca18f7..9034d732e 100644
 --- a/js/gdm/loginDialog.js
 +++ b/js/gdm/loginDialog.js
-@@ -734,6 +734,9 @@ const LoginDialog = new Lang.Class({
+@@ -729,6 +729,9 @@ const LoginDialog = new Lang.Class({
  
              if (this._authPrompt.verificationStatus == AuthPrompt.AuthPromptStatus.NOT_VERIFYING)
                  this._authPrompt.reset();
-+            
++
 +            if (this._disableUserList && this._timedLoginUserListHold)
 +                this._timedLoginUserListHold.release();
          }
      },
  
-@@ -971,6 +974,9 @@ const LoginDialog = new Lang.Class({
+@@ -984,6 +987,9 @@ const LoginDialog = new Lang.Class({
      },
  
      _showTimedLoginAnimation: function() {
@@ -115,7 +128,7 @@ index b577520..a370e1c 100644
          this._timedLoginItem.actor.grab_key_focus();
          return this._timedLoginItem.showTimedLoginIndicator(this._timedLoginAnimationTime);
      },
-@@ -998,19 +1004,31 @@ const LoginDialog = new Lang.Class({
+@@ -1011,19 +1017,31 @@ const LoginDialog = new Lang.Class({
      },
  
      _startTimedLogin: function(userName, delay) {
@@ -149,7 +162,7 @@ index b577520..a370e1c 100644
                           // If we're just starting out, start on the right
                           // item.
                           if (!this._userManager.is_loaded) {
-@@ -1021,6 +1039,9 @@ const LoginDialog = new Lang.Class({
+@@ -1034,6 +1052,9 @@ const LoginDialog = new Lang.Class({
                       this._blockTimedLoginUntilIdle,
  
                       function() {
@@ -159,7 +172,7 @@ index b577520..a370e1c 100644
                           this._userList.scrollToItem(this._timedLoginItem);
                       },
  
-@@ -1045,7 +1066,9 @@ const LoginDialog = new Lang.Class({
+@@ -1058,7 +1079,9 @@ const LoginDialog = new Lang.Class({
          if (this._timedLoginItem)
              this._timedLoginItem.hideTimedLoginIndicator();
  
@@ -171,5 +184,5 @@ index b577520..a370e1c 100644
          if (userName)
              this._startTimedLogin(userName, this._timedLoginDelay);
 -- 
-1.8.3.1
+2.12.0
 

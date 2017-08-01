@@ -1,35 +1,48 @@
-From 16febef9581d3689fc61861086432e188d4dcb2d Mon Sep 17 00:00:00 2001
+From ea91b6c39c1c17abca0a5f34b3047a5cd5314127 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 15 Jan 2014 16:45:34 -0500
 Subject: [PATCH] panel: add an icon to the ActivitiesButton
 
 Requested by brand
 ---
- data/theme/gnome-shell.css | 5 +++++
- js/ui/panel.js             | 9 ++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ data/theme/gnome-shell-high-contrast.css | 3 +++
+ data/theme/gnome-shell.css               | 3 +++
+ js/ui/panel.js                           | 9 ++++++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
 
+diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
+index 28922be77..3ce5278e1 100644
+--- a/data/theme/gnome-shell-high-contrast.css
++++ b/data/theme/gnome-shell-high-contrast.css
+@@ -685,6 +685,9 @@ StScrollBar {
+       -st-icon-style: symbolic;
+       margin-left: 4px;
+       margin-right: 4px; }
++    #panel .panel-button .panel-logo-icon {
++      padding-right: .4em;
++      icon-size: 1em; }
+     #panel .panel-button:hover {
+       color: white; }
+     #panel .panel-button:active, #panel .panel-button:overview, #panel .panel-button:focus, #panel .panel-button:checked {
 diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
-index 8f84c44..c8a1bd9 100644
+index 690722372..342bebe9d 100644
 --- a/data/theme/gnome-shell.css
 +++ b/data/theme/gnome-shell.css
-@@ -713,6 +713,11 @@ StScrollBar StButton#vhandle:active {
-     icon-shadow: black 0px 2px 2px;
- }
- 
-+.panel-logo-icon {
-+  padding-right: .4em;
-+  icon-size: 1em;
-+}
-+
- .panel-menu {
-     -boxpointer-gap: 4px;
- }
+@@ -685,6 +685,9 @@ StScrollBar {
+       -st-icon-style: symbolic;
+       margin-left: 4px;
+       margin-right: 4px; }
++    #panel .panel-button .panel-logo-icon {
++      padding-right: .4em;
++      icon-size: 1em; }
+     #panel .panel-button:hover {
+       color: white; }
+     #panel .panel-button:active, #panel .panel-button:overview, #panel .panel-button:focus, #panel .panel-button:checked {
 diff --git a/js/ui/panel.js b/js/ui/panel.js
-index 05d43f9..dd04601 100644
+index e05a6223c..d07bbaa7b 100644
 --- a/js/ui/panel.js
 +++ b/js/ui/panel.js
-@@ -562,11 +562,18 @@ const ActivitiesButton = new Lang.Class({
+@@ -409,11 +409,18 @@ const ActivitiesButton = new Lang.Class({
  
          this.actor.name = 'panelActivities';
  
@@ -50,5 +63,5 @@ index 05d43f9..dd04601 100644
          this.actor.label_actor = this._label;
  
 -- 
-2.3.3
+2.12.0
 
