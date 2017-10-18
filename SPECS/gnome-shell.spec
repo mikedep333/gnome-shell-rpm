@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.26.2
-Release:        2%{?dist}
+Release:        2.0.1.cdc_integration%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -44,6 +44,11 @@ Patch35: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
 Patch36: 0001-windowMenu-Bring-back-workspaces-submenu-for-static-.patch
 Patch37: 0001-global-Allow-overriding-the-override-schema.patch
 Patch38: 0001-system-don-t-throw-an-exception-if-power-off-disable.patch
+
+# Fix Centrify smartcard switch-user issue
+# https://bugzilla.redhat.com/show_bug.cgi?id=1238342
+# https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
+patch50: 0001-gdm-Set-the-PAM-smartcard-service-name-for-gnome-scr.patch
 
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.45.4
@@ -255,6 +260,12 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Wed Feb 14 2018 Mike DePaulo (GFDL) - 3.26.2-2.0.1.cdc_integration
+- gdm: Set the PAM smartcard service name for gnome-screensaver if we are in a user session rather than gdm
+- Fixes the need for Centrify smartcard users to select "switch user" to unlock their session.
+  https://bugzilla.redhat.com/show_bug.cgi?id=1238342
+  https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
+
 * Mon Nov 13 2017 Ray Strode <rstrode@redhat.com> - 3.26.2-2
 - Don't throw an exception is poweroff is disabled
   Resolves: #1512662

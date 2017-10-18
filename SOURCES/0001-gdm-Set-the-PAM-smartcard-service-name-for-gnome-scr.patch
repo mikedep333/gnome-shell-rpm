@@ -1,0 +1,78 @@
+From a2f78bb6834924953138b82aa2fa371e9954fe18 Mon Sep 17 00:00:00 2001
+From: Mike DePaulo <Michael.DePaulo@noaa.gov>
+Date: Tue, 17 Oct 2017 17:16:08 -0400
+Subject: [PATCH] gdm: Set the PAM smartcard service name for gnome-screensaver
+ if we are in a user session rather than gdm
+
+Fixes the need for Centrify smartcard users to select "switch user" to unlock their session.
+
+Conflicts:
+	js/gdm/util.js
+---
+ js/gdm/authPrompt.js |  6 ++++--
+ js/gdm/util.js       | 11 ++++++++---
+ 2 files changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/js/gdm/authPrompt.js b/js/gdm/authPrompt.js
+index 7f23f00..871c6fb 100644
+--- a/js/gdm/authPrompt.js
++++ b/js/gdm/authPrompt.js
+@@ -330,7 +330,8 @@ var AuthPrompt = new Lang.Class({
+         //                        with a smartcard
+         //                     2) Don't reset if we've already succeeded at verification and
+         //                        the user is getting logged in.
+-        if (this._userVerifier.serviceIsDefault(GdmUtil.SMARTCARD_SERVICE_NAME) &&
++        if ((this._userVerifier.serviceIsDefault(GdmUtil.SMARTCARD_SERVICE_NAME) ||
++            this._userVerifier.serviceIsDefault(GdmUtil.SMARTCARD_SERVICE_NAME_USER_SESSION)) &&
+             this.verificationStatus == AuthPromptStatus.VERIFYING &&
+             this.smartcardDetected)
+             return;
+@@ -619,7 +620,8 @@ var AuthPrompt = new Lang.Class({
+             // respond to the request with the username
+             beginRequestType = BeginRequestType.PROVIDE_USERNAME;
+         } else if (this._userVerifier.serviceIsForeground(GdmUtil.OVIRT_SERVICE_NAME) ||
+-                   this._userVerifier.serviceIsForeground(GdmUtil.SMARTCARD_SERVICE_NAME)) {
++                   this._userVerifier.serviceIsForeground(GdmUtil.SMARTCARD_SERVICE_NAME) ||
++                   this._userVerifier.serviceIsForeground(GdmUtil.SMARTCARD_SERVICE_NAME_USER_SESSION)) {
+             // We don't need to know the username if the user preempted the login screen
+             // with a smartcard or with preauthenticated oVirt credentials
+             beginRequestType = BeginRequestType.DONT_PROVIDE_USERNAME;
+diff --git a/js/gdm/util.js b/js/gdm/util.js
+index 9fc61f5..7e2b076 100644
+--- a/js/gdm/util.js
++++ b/js/gdm/util.js
+@@ -20,6 +20,7 @@ const Tweener = imports.ui.tweener;
+ var PASSWORD_SERVICE_NAME = 'gdm-password';
+ var FINGERPRINT_SERVICE_NAME = 'gdm-fingerprint';
+ var SMARTCARD_SERVICE_NAME = 'gdm-smartcard';
++var SMARTCARD_SERVICE_NAME_USER_SESSION = 'gnome-screensaver';
+ var OVIRT_SERVICE_NAME = 'gdm-ovirtcred';
+ var FADE_ANIMATION_TIME = 0.16;
+ var CLONE_FADE_ANIMATION_TIME = 0.25;
+@@ -340,8 +341,12 @@ var ShellUserVerifier = new Lang.Class({
+             this.smartcardDetected = smartcardDetected;
+ 
+             if (this.smartcardDetected)
+-                this._preemptingService = SMARTCARD_SERVICE_NAME;
+-            else if (this._preemptingService == SMARTCARD_SERVICE_NAME)
++                if (this._smartcardManager.loggedInWithToken())
++                    this._preemptingService = SMARTCARD_SERVICE_NAME_USER_SESSION;
++                else
++                    this._preemptingService = SMARTCARD_SERVICE_NAME;
++            else if (this._preemptingService == SMARTCARD_SERVICE_NAME ||
++                this._preemptingService == SMARTCARD_SERVICE_NAME_USER_SESSION)
+                 this._preemptingService = null;
+ 
+             this._updateDefaultService();
+@@ -438,7 +443,7 @@ var ShellUserVerifier = new Lang.Class({
+ 
+     _updateDefaultService: function() {
+         if (this._smartcardManager.loggedInWithToken())
+-            this._defaultService = SMARTCARD_SERVICE_NAME;
++            this._defaultService = SMARTCARD_SERVICE_NAME_USER_SESSION;
+         else if (this._settings.get_boolean(PASSWORD_AUTHENTICATION_KEY))
+             this._defaultService = PASSWORD_SERVICE_NAME;
+         else if (this._settings.get_boolean(SMARTCARD_AUTHENTICATION_KEY))
+-- 
+1.8.3.1
+
