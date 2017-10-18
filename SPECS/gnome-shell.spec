@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.22.3
-Release:        17%{?dist}
+Release:        17.0.1%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -47,6 +47,11 @@ Patch40: 0001-network-Close-Wifi-selection-dialog-when-appropriate.patch
 Patch41: 0001-calendar-server-Remove-unused-variables-and-function.patch
 Patch42: 0001-st-Add-missing-NULL-check.patch
 patch43: 0001-network-Fix-initial-visibility-of-summary-item.patch
+
+# Fix Centrify smartcard switch-user issue
+# https://bugzilla.redhat.com/show_bug.cgi?id=1238342
+# https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
+patch44: 0001-gdm-Set-the-PAM-smartcard-service-name-for-gnome-scr.patch
 
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.45.4
@@ -252,6 +257,12 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Wed Oct 18 2017 Mike DePaulo (GFDL) - 3.22.3-17.0.1
+- gdm: Set the PAM smartcard service name for gnome-screensaver if we are in a user session rather than gdm
+- Fixes the need for Centrify smartcard users to select "switch user" to unlock their session.
+  https://bugzilla.redhat.com/show_bug.cgi?id=1238342
+  https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
+
 * Mon Jun 26 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-17
 - Fix PAM info messages in unlock screen
   Related: #1449359
