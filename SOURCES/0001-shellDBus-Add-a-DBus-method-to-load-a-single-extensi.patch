@@ -1,0 +1,52 @@
+From f163645029cb5af8471d01379aa9b251e6ac2ae0 Mon Sep 17 00:00:00 2001
+From: Rui Matos <tiagomatos@gmail.com>
+Date: Fri, 8 Nov 2013 11:36:04 +0100
+Subject: [PATCH] shellDBus: Add a DBus method to load a single extension
+
+This allows e.g. gnome-tweak-tool to install an extension from a zip
+file and load it into the running shell.
+---
+ js/ui/shellDBus.js | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/js/ui/shellDBus.js b/js/ui/shellDBus.js
+index 3fd24d275..d9f36b281 100644
+--- a/js/ui/shellDBus.js
++++ b/js/ui/shellDBus.js
+@@ -322,6 +322,10 @@ const GnomeShellExtensionsIface = '<node> \
+ </method> \
+ <method name="CheckForUpdates"> \
+ </method> \
++<method name="LoadUserExtension"> \
++    <arg type="s" direction="in" name="uuid"/> \
++    <arg type="b" direction="out" name="success"/> \
++</method> \
+ <property name="ShellVersion" type="s" access="read" /> \
+ </interface> \
+ </node>';
+@@ -424,6 +428,22 @@ var GnomeShellExtensions = new Lang.Class({
+         ExtensionDownloader.checkForUpdates();
+     },
+ 
++    LoadUserExtension: function(uuid) {
++        let extension = ExtensionUtils.extensions[uuid];
++        if (extension)
++            return true;
++
++        let dir = Gio.File.new_for_path(GLib.build_filenamev([global.userdatadir, 'extensions', uuid]));
++        try {
++            extension = ExtensionUtils.createExtensionObject(uuid, dir, ExtensionUtils.ExtensionType.PER_USER);
++            ExtensionSystem.loadExtension(extension);
++        } catch (e) {
++            log('Could not load user extension from %s'.format(dir.get_path()));
++            return false;
++        }
++        return true;
++    },
++
+     ShellVersion: Config.PACKAGE_VERSION,
+ 
+     _extensionStateChanged: function(_, newState) {
+-- 
+2.14.2
+

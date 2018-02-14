@@ -1,0 +1,33 @@
+From 7d9fa52a96cd5698ccb4773ffb71ab23b2a22a3d Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 3 Jul 2015 13:54:36 -0400
+Subject: [PATCH] screenShield: unblank when inserting smartcard
+
+If a user inserts the smartcard when the screen is locked/blanked
+we should ask them their pin right away.
+
+At the moment they have to wiggle the mouse or do some other
+action to get the screen to unblank.
+---
+ js/ui/screenShield.js | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/js/ui/screenShield.js b/js/ui/screenShield.js
+index 9f3ff84ad..8d3eb43d4 100644
+--- a/js/ui/screenShield.js
++++ b/js/ui/screenShield.js
+@@ -516,8 +516,10 @@ var ScreenShield = new Lang.Class({
+         this._smartcardManager = SmartcardManager.getSmartcardManager();
+         this._smartcardManager.connect('smartcard-inserted',
+                                        Lang.bind(this, function(manager, token) {
+-                                           if (this._isLocked && token.UsedToLogin)
++                                           if (this._isLocked && token.UsedToLogin) {
++                                               this._wakeUpScreen();
+                                                this._liftShield(true, 0);
++                                           }
+                                        }));
+ 
+         this._oVirtCredentialsManager = OVirt.getOVirtCredentialsManager();
+-- 
+2.14.2
+

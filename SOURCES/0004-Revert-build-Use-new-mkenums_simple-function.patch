@@ -1,0 +1,200 @@
+From 20f85200472835180a6302928f05b86063dfb00d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Tue, 24 Oct 2017 02:45:00 +0200
+Subject: [PATCH 4/4] Revert "build: Use new mkenums_simple() function"
+
+This reverts commit ab0e98dfdd49d73373eb4367a299593b96211f80.
+---
+ src/meson.build           |  6 ++++--
+ src/shell-enum-types.c.in | 30 ++++++++++++++++++++++++++++++
+ src/shell-enum-types.h.in | 25 +++++++++++++++++++++++++
+ src/st/meson.build        |  8 +++-----
+ src/st/st-enum-types.c.in | 33 +++++++++++++++++++++++++++++++++
+ src/st/st-enum-types.h.in | 29 +++++++++++++++++++++++++++++
+ 6 files changed, 124 insertions(+), 7 deletions(-)
+ create mode 100644 src/shell-enum-types.c.in
+ create mode 100644 src/shell-enum-types.h.in
+ create mode 100644 src/st/st-enum-types.c.in
+ create mode 100644 src/st/st-enum-types.h.in
+
+diff --git a/src/meson.build b/src/meson.build
+index 3e5557351..1e88bf5d5 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -182,8 +182,10 @@ if enable_recorder
+ endif
+ 
+ 
+-libshell_enums = gnome.mkenums_simple('shell-enum-types',
+-  sources: libshell_public_headers
++libshell_enums = gnome.mkenums('shell-enum-types',
++  sources: libshell_public_headers,
++  c_template: 'shell-enum-types.c.in',
++  h_template: 'shell-enum-types.h.in'
+ )
+ 
+ libshell_gir_sources = [
+diff --git a/src/shell-enum-types.c.in b/src/shell-enum-types.c.in
+new file mode 100644
+index 000000000..b350d0016
+--- /dev/null
++++ b/src/shell-enum-types.c.in
+@@ -0,0 +1,30 @@
++/*** BEGIN file-header ***/
++#include "shell-enum-types.h"
++/*** END file-header ***/
++
++/*** BEGIN file-production ***/
++/* enumerations from "@filename@" */
++#include "@filename@"
++/*** END file-production ***/
++
++/*** BEGIN value-header ***/
++GType
++@enum_name@_get_type(void) {
++  static GType enum_type_id = 0;
++  if (G_UNLIKELY (!enum_type_id))
++    {
++      static const G@Type@Value values[] = {
++/*** END value-header ***/
++
++/*** BEGIN value-production ***/
++        { @VALUENAME@, "@VALUENAME@", "@valuenick@" },
++/*** END value-production ***/
++
++/*** BEGIN value-tail ***/
++        { 0, NULL, NULL }
++      };
++      enum_type_id = g_@type@_register_static("@EnumName@", values);
++    }
++  return enum_type_id;
++}
++/*** END value-tail ***/
+diff --git a/src/shell-enum-types.h.in b/src/shell-enum-types.h.in
+new file mode 100644
+index 000000000..a6aea7d17
+--- /dev/null
++++ b/src/shell-enum-types.h.in
+@@ -0,0 +1,25 @@
++/*** BEGIN file-header ***/
++#ifndef __SHELL_ENUM_TYPES_H__
++#define __SHELL_ENUM_TYPES_H__
++
++#include <glib-object.h>
++
++G_BEGIN_DECLS
++
++/*** END file-header ***/
++
++/*** BEGIN file-production ***/
++/* enumerations from "@filename@" */
++/*** END file-production ***/
++
++/*** BEGIN file-tail ***/
++G_END_DECLS
++
++#endif /* !__SHELL_ENUM_TYPES_H__ */
++/*** END file-tail ***/
++
++/*** BEGIN value-header ***/
++GType @enum_name@_get_type (void) G_GNUC_CONST;
++#define SHELL_TYPE_@ENUMSHORT@ (@enum_name@_get_type())
++
++/*** END value-header ***/
+diff --git a/src/st/meson.build b/src/st/meson.build
+index fa9d6bbf4..46378a2f1 100644
+--- a/src/st/meson.build
++++ b/src/st/meson.build
+@@ -82,12 +82,10 @@ st_sources = [
+   'st-widget.c'
+ ]
+ 
+-st_enums = gnome.mkenums_simple('st-enum-types',
++st_enums = gnome.mkenums('st-enum-types',
+   sources: st_headers,
+-  header_prefix: '''
+-#if !defined(ST_H_INSIDE) && !defined(ST_COMPILATION)
+-#error "Only <st/st.h> can be included directly.h"
+-#endif'''
++  c_template: 'st-enum-types.c.in',
++  h_template: 'st-enum-types.h.in'
+ )
+ 
+ st_gir_sources = st_sources + st_private_headers + st_headers + st_enums
+diff --git a/src/st/st-enum-types.c.in b/src/st/st-enum-types.c.in
+new file mode 100644
+index 000000000..bf0c54470
+--- /dev/null
++++ b/src/st/st-enum-types.c.in
+@@ -0,0 +1,33 @@
++/*** BEGIN file-header ***/
++#ifndef ST_COMPILATION
++#define ST_COMPILATION
++#endif
++#include "st-enum-types.h"
++/*** END file-header ***/
++
++/*** BEGIN file-production ***/
++/* enumerations from "@filename@" */
++#include "@filename@"
++/*** END file-production ***/
++
++/*** BEGIN value-header ***/
++GType
++@enum_name@_get_type(void) {
++  static GType enum_type_id = 0;
++  if (G_UNLIKELY (!enum_type_id))
++    {
++      static const G@Type@Value values[] = {
++/*** END value-header ***/
++
++/*** BEGIN value-production ***/
++        { @VALUENAME@, "@VALUENAME@", "@valuenick@" },
++/*** END value-production ***/
++
++/*** BEGIN value-tail ***/
++        { 0, NULL, NULL }
++      };
++      enum_type_id = g_@type@_register_static (g_intern_static_string ("@EnumName@"), values);
++    }
++  return enum_type_id;
++}
++/*** END value-tail ***/
+diff --git a/src/st/st-enum-types.h.in b/src/st/st-enum-types.h.in
+new file mode 100644
+index 000000000..b3dd0e74e
+--- /dev/null
++++ b/src/st/st-enum-types.h.in
+@@ -0,0 +1,29 @@
++/*** BEGIN file-header ***/
++#if !defined(ST_H_INSIDE) && !defined(ST_COMPILATION)
++#error "Only <st/st.h> can be included directly.h"
++#endif
++
++#ifndef __ST_ENUM_TYPES_H__
++#define __ST_ENUM_TYPES_H__
++
++#include <glib-object.h>
++
++G_BEGIN_DECLS
++
++/*** END file-header ***/
++
++/*** BEGIN file-production ***/
++/* enumerations from "@filename@" */
++/*** END file-production ***/
++
++/*** BEGIN file-tail ***/
++G_END_DECLS
++
++#endif /* !__ST_ENUM_TYPES_H__ */
++/*** END file-tail ***/
++
++/*** BEGIN value-header ***/
++GType @enum_name@_get_type (void) G_GNUC_CONST;
++#define ST_TYPE_@ENUMSHORT@ (@enum_name@_get_type())
++
++/*** END value-header ***/
+-- 
+2.14.2
+

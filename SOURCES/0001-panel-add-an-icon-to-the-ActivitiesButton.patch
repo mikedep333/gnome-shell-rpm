@@ -1,0 +1,67 @@
+From 7196f5d0a60243e218d6a906b9db4f3b6608b47c Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 15 Jan 2014 16:45:34 -0500
+Subject: [PATCH] panel: add an icon to the ActivitiesButton
+
+Requested by brand
+---
+ data/theme/gnome-shell-high-contrast.css | 3 +++
+ data/theme/gnome-shell.css               | 3 +++
+ js/ui/panel.js                           | 9 ++++++++-
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
+index 51477e713..e7b94624a 100644
+--- a/data/theme/gnome-shell-high-contrast.css
++++ b/data/theme/gnome-shell-high-contrast.css
+@@ -688,6 +688,9 @@ StScrollBar {
+       -st-icon-style: symbolic;
+       margin-left: 4px;
+       margin-right: 4px; }
++    #panel .panel-button .panel-logo-icon {
++      padding-right: .4em;
++      icon-size: 1em; }
+     #panel .panel-button .system-status-icon,
+     #panel .panel-button .app-menu-icon > StIcon,
+     #panel .panel-button .popup-menu-arrow {
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index 6aab70867..c1207dcd5 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -688,6 +688,9 @@ StScrollBar {
+       -st-icon-style: symbolic;
+       margin-left: 4px;
+       margin-right: 4px; }
++    #panel .panel-button .panel-logo-icon {
++      padding-right: .4em;
++      icon-size: 1em; }
+     #panel .panel-button .system-status-icon,
+     #panel .panel-button .app-menu-icon > StIcon,
+     #panel .panel-button .popup-menu-arrow {
+diff --git a/js/ui/panel.js b/js/ui/panel.js
+index d7c8397b5..3ec43210e 100644
+--- a/js/ui/panel.js
++++ b/js/ui/panel.js
+@@ -409,11 +409,18 @@ var ActivitiesButton = new Lang.Class({
+ 
+         this.actor.name = 'panelActivities';
+ 
++        let box = new St.BoxLayout();
++        this.actor.add_actor(box);
++        let iconFile = Gio.File.new_for_path('/usr/share/icons/hicolor/scalable/apps/start-here.svg');
++        this._icon = new St.Icon({ gicon: new Gio.FileIcon({ file: iconFile }),
++                                   style_class: 'panel-logo-icon' });
++        box.add_actor(this._icon);
++
+         /* Translators: If there is no suitable word for "Activities"
+            in your language, you can use the word for "Overview". */
+         this._label = new St.Label({ text: _("Activities"),
+                                      y_align: Clutter.ActorAlign.CENTER });
+-        this.actor.add_actor(this._label);
++        box.add_actor(this._label);
+ 
+         this.actor.label_actor = this._label;
+ 
+-- 
+2.14.2
+

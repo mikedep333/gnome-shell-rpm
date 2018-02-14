@@ -1,0 +1,1632 @@
+From a24679ddf8b96590fc6bf5ed7fadc8724a40445c Mon Sep 17 00:00:00 2001
+From: Olivier Fourdan <ofourdan@redhat.com>
+Date: Fri, 15 Sep 2017 10:39:50 +0200
+Subject: [PATCH 1/2] Revert "build: Drop autotools support"
+
+This reverts commit cf010cfd8fc1440373c1ed44540a54a5341cf3eb.
+---
+ Makefile.am                      |  33 ++++
+ autogen.sh                       |  35 ++++
+ browser-plugin/Makefile.am       |  23 +++
+ configure.ac                     | 280 +++++++++++++++++++++++++++++++
+ data/Makefile.am                 | 136 +++++++++++++++
+ docs/Makefile.am                 |   1 +
+ docs/reference/Makefile.am       |   1 +
+ docs/reference/shell/Makefile.am | 139 ++++++++++++++++
+ docs/reference/st/Makefile.am    | 104 ++++++++++++
+ gtk-doc.make                     | 304 ++++++++++++++++++++++++++++++++++
+ js/Makefile.am                   |  39 +++++
+ man/Makefile.am                  |  19 +++
+ src/Makefile.am                  | 349 +++++++++++++++++++++++++++++++++++++++
+ tests/Makefile.am                |  45 +++++
+ 14 files changed, 1508 insertions(+)
+ create mode 100644 Makefile.am
+ create mode 100755 autogen.sh
+ create mode 100644 browser-plugin/Makefile.am
+ create mode 100644 configure.ac
+ create mode 100644 data/Makefile.am
+ create mode 100644 docs/Makefile.am
+ create mode 100644 docs/reference/Makefile.am
+ create mode 100644 docs/reference/shell/Makefile.am
+ create mode 100644 docs/reference/st/Makefile.am
+ create mode 100644 gtk-doc.make
+ create mode 100644 js/Makefile.am
+ create mode 100644 man/Makefile.am
+ create mode 100644 src/Makefile.am
+ create mode 100644 tests/Makefile.am
+
+diff --git a/Makefile.am b/Makefile.am
+new file mode 100644
+index 000000000..eba7d2b28
+--- /dev/null
++++ b/Makefile.am
+@@ -0,0 +1,33 @@
++# Point to our macro directory and pick up user flags from the environment
++ACLOCAL_AMFLAGS  = -I m4 ${ACLOCAL_FLAGS}
++
++SUBDIRS = data js subprojects/gvc src  tests po docs
++
++if BUILD_BROWSER_PLUGIN
++SUBDIRS += browser-plugin
++endif
++
++if ENABLE_MAN
++SUBDIRS += man
++endif
++
++EXTRA_DIST =		\
++	.project	\
++	.settings	\
++	autogen.sh	\
++	tools/check-for-missing.py
++
++# These are files checked into Git that we don't want to distribute
++DIST_EXCLUDE =					\
++	.gitignore				\
++	.gitmodules				\
++	gnome-shell.doap			\
++	HACKING					\
++	MAINTAINERS				\
++	tools/build/*
++
++distcheck-hook:
++	@echo "Checking disted files against files in git"
++	@$(srcdir)/tools/check-for-missing.py $(srcdir) $(distdir) $(DIST_EXCLUDE)
++
++DISTCHECK_CONFIGURE_FLAGS = --enable-gtk-doc --enable-man
+diff --git a/autogen.sh b/autogen.sh
+new file mode 100755
+index 000000000..9794dc3b9
+--- /dev/null
++++ b/autogen.sh
+@@ -0,0 +1,35 @@
++#!/bin/sh
++# Run this to generate all the initial makefiles, etc.
++
++srcdir=`dirname $0`
++test -z "$srcdir" && srcdir=.
++
++olddir="$(pwd)"
++
++cd "${srcdir}"
++
++(test -f configure.ac \
++  && test -d src) || {
++    echo -n "**Error**: Directory "\`$srcdir\'" does not look like the"
++    echo " top-level gnome-shell directory"
++    exit 1
++}
++
++# Fetch submodules if needed
++if test ! -f subprojects/gvc/Makefile.am || test ! -f data/theme/gnome-shell-sass/COPYING;
++then
++  echo "+ Setting up submodules"
++  git submodule init
++fi
++git submodule update
++
++aclocal --install || exit 1
++gtkdocize --copy || exit 1
++intltoolize --force --copy --automake || exit 1
++autoreconf --verbose --force --install || exit 1
++
++cd "${olddir}"
++
++if [ "$NOCONFIGURE" = "" ]; then
++    "${srcdir}/configure" "$@" || exit 1
++fi
+diff --git a/browser-plugin/Makefile.am b/browser-plugin/Makefile.am
+new file mode 100644
+index 000000000..6ed1d6340
+--- /dev/null
++++ b/browser-plugin/Makefile.am
+@@ -0,0 +1,23 @@
++
++mozillalibdir = $(BROWSER_PLUGIN_DIR)
++
++mozillalib_LTLIBRARIES = libgnome-shell-browser-plugin.la
++
++# Browsers can unload and reload the module while browsing, which is not supported by GObject.
++# We pass -Wl,-z,nodelete to the linker to ensure the module is never unloaded.
++# https://bugzilla.gnome.org/show_bug.cgi?id=737932
++libgnome_shell_browser_plugin_la_LDFLAGS = -module -avoid-version -no-undefined -Wl,-z,nodelete
++
++libgnome_shell_browser_plugin_la_LIBADD = 	\
++	$(BROWSER_PLUGIN_LIBS)
++
++libgnome_shell_browser_plugin_la_SOURCES = 	\
++	browser-plugin.c \
++	npapi/npapi.h \
++	npapi/npfunctions.h \
++	npapi/npruntime.h \
++	npapi/nptypes.h
++
++libgnome_shell_browser_plugin_la_CFLAGS = 	\
++	$(BROWSER_PLUGIN_CFLAGS)		\
++	-DG_LOG_DOMAIN=\"GnomeShellBrowserPlugin\"
+diff --git a/configure.ac b/configure.ac
+new file mode 100644
+index 000000000..6372c4dff
+--- /dev/null
++++ b/configure.ac
+@@ -0,0 +1,280 @@
++AC_PREREQ(2.63)
++AC_INIT([gnome-shell],[3.25.4],[https://bugzilla.gnome.org/enter_bug.cgi?product=gnome-shell],[gnome-shell])
++AX_IS_RELEASE([git-directory])
++
++AC_CONFIG_HEADERS([config.h])
++AC_CONFIG_SRCDIR([src/shell-global.c])
++AC_CONFIG_MACRO_DIR([m4])
++AC_CONFIG_AUX_DIR([config])
++
++AC_SUBST([PACKAGE_NAME], ["$PACKAGE_NAME"])
++AC_SUBST([PACKAGE_VERSION], ["$PACKAGE_VERSION"])
++
++AM_INIT_AUTOMAKE([1.11 no-dist-gzip dist-xz tar-ustar foreign])
++AM_MAINTAINER_MODE([enable])
++
++m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
++
++# Checks for programs.
++AC_PROG_CC
++
++# Initialize libtool
++LT_PREREQ([2.2.6])
++LT_INIT([disable-static])
++
++# i18n
++GETTEXT_PACKAGE=gnome-shell
++AC_SUBST(GETTEXT_PACKAGE)
++AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE, "$GETTEXT_PACKAGE",
++                   [The prefix for our gettext translation domains.])
++
++AM_GNU_GETTEXT_VERSION([0.19.6])
++AM_GNU_GETTEXT([external])
++
++PKG_PROG_PKG_CONFIG([0.22])
++
++AC_PATH_PROG([XSLTPROC], [xsltproc])
++
++GLIB_GSETTINGS
++
++# Get a value to substitute into gnome-shell.in
++AM_PATH_PYTHON([3])
++AC_SUBST(PYTHON)
++
++# We depend on a specific version of the libmutter API. The mutter variants of
++# the Cogl and Clutter libraries also use this API version.
++LIBMUTTER_API_VERSION=1
++
++LIBMUTTER=libmutter-$LIBMUTTER_API_VERSION
++LIBMUTTER_COGL=mutter-cogl-$LIBMUTTER_API_VERSION
++LIBMUTTER_COGL_PANGO=mutter-cogl-pango-$LIBMUTTER_API_VERSION
++LIBMUTTER_CLUTTER=mutter-clutter-$LIBMUTTER_API_VERSION
++
++# We need at least this, since gst_plugin_register_static() was added
++# in 0.10.16, but nothing older than 0.10.21 has been tested.
++GSTREAMER_MIN_VERSION=0.11.92
++
++recorder_modules=
++build_recorder=false
++AC_MSG_CHECKING([for GStreamer (needed for recording functionality)])
++if $PKG_CONFIG --exists gstreamer-1.0 '>=' $GSTREAMER_MIN_VERSION ; then
++   AC_MSG_RESULT(yes)
++   build_recorder=true
++   recorder_modules="gstreamer-1.0 gstreamer-base-1.0 x11 gtk+-3.0"
++else
++   AC_MSG_RESULT(no)
++fi
++
++AM_CONDITIONAL(BUILD_RECORDER, $build_recorder)
++
++AC_ARG_ENABLE([systemd],
++              AS_HELP_STRING([--enable-systemd], [Use systemd]),
++              [enable_systemd=$enableval],
++              [enable_systemd=auto])
++AS_IF([test x$enable_systemd != xno], [
++  AC_MSG_CHECKING([for libsystemd])
++  PKG_CHECK_EXISTS([libsystemd],
++                   [have_systemd=yes
++                    AC_DEFINE([HAVE_SYSTEMD], [1], [Define if we have systemd])],
++                   [have_systemd=no])
++  AC_MSG_RESULT($have_systemd)
++])
++
++AC_MSG_RESULT($enable_systemd)
++
++GOBJECT_INTROSPECTION_MIN_VERSION=1.49.1
++GJS_MIN_VERSION=1.47.0
++MUTTER_MIN_VERSION=3.25.3
++GTK_MIN_VERSION=3.15.0
++GIO_MIN_VERSION=2.53.0
++LIBECAL_MIN_VERSION=3.5.3
++LIBEDATASERVER_MIN_VERSION=3.17.2
++POLKIT_MIN_VERSION=0.100
++STARTUP_NOTIFICATION_MIN_VERSION=0.11
++GCR_MIN_VERSION=3.7.5
++GNOME_DESKTOP_REQUIRED_VERSION=3.7.90
++NETWORKMANAGER_MIN_VERSION=0.9.8
++PULSE_MIN_VERS=2.0
++
++# Collect more than 20 libraries for a prize!
++SHARED_PCS="gio-unix-2.0 >= $GIO_MIN_VERSION
++            libxml-2.0
++            gtk+-3.0 >= $GTK_MIN_VERSION
++            atk-bridge-2.0
++            gjs-1.0 >= $GJS_MIN_VERSION
++            $recorder_modules
++            gdk-x11-3.0 libsoup-2.4
++            $LIBMUTTER_CLUTTER >= $MUTTER_MIN_VERSION
++            $LIBMUTTER_COGL_PANGO
++            libstartup-notification-1.0 >= $STARTUP_NOTIFICATION_MIN_VERSION
++            gobject-introspection-1.0 >= $GOBJECT_INTROSPECTION_MIN_VERSION
++            libcanberra libcanberra-gtk3
++            polkit-agent-1 >= $POLKIT_MIN_VERSION
++            gcr-base-3 >= $GCR_MIN_VERSION"
++if test x$have_systemd = xyes; then
++  SHARED_PCS="${SHARED_PCS} libsystemd"
++fi
++
++PKG_CHECK_MODULES(GNOME_SHELL, $SHARED_PCS)
++PKG_CHECK_MODULES(MUTTER, $LIBMUTTER >= $MUTTER_MIN_VERSION)
++
++PKG_CHECK_MODULES(GNOME_SHELL_JS, gio-2.0 gjs-1.0 >= $GJS_MIN_VERSION)
++PKG_CHECK_MODULES(ST, $LIBMUTTER_CLUTTER gtk+-3.0 libcroco-0.6 >= 0.6.8 x11)
++PKG_CHECK_MODULES(SHELL_PERF_HELPER, gtk+-3.0 gio-2.0)
++PKG_CHECK_MODULES(SHELL_HOTPLUG_SNIFFER, gio-2.0 gdk-pixbuf-2.0)
++PKG_CHECK_MODULES(TRAY, $LIBMUTTER_CLUTTER gtk+-3.0)
++PKG_CHECK_MODULES(GVC, libpulse >= $PULSE_MIN_VERS libpulse-mainloop-glib gobject-2.0)
++PKG_CHECK_MODULES(DESKTOP_SCHEMAS, gsettings-desktop-schemas >= 3.21.3)
++
++AC_SUBST(LIBMUTTER_API_VERSION)
++
++AC_ARG_ENABLE(browser-plugin,
++              [AS_HELP_STRING([--enable-browser-plugin],
++                              [Enable browser plugin [default=yes]])],,
++              enable_browser_plugin=yes)
++AS_IF([test x$enable_browser_plugin = xyes], [
++  PKG_CHECK_MODULES(BROWSER_PLUGIN, gio-2.0 >= $GIO_MIN_VERSION json-glib-1.0 >= 0.13.2)
++])
++AM_CONDITIONAL(BUILD_BROWSER_PLUGIN, test x$enable_browser_plugin = xyes)
++
++PKG_CHECK_MODULES(BLUETOOTH, gnome-bluetooth-1.0 >= 3.9.0,
++        [AC_DEFINE([HAVE_BLUETOOTH],[1],[Define if you have libgnome-bluetooth-applet])
++	 AC_SUBST([HAVE_BLUETOOTH],[1])],
++	[AC_DEFINE([HAVE_BLUETOOTH],[0])
++	 AC_SUBST([HAVE_BLUETOOTH],[0])])
++
++PKG_CHECK_MODULES(CALENDAR_SERVER, libecal-1.2 >= $LIBECAL_MIN_VERSION libedataserver-1.2 >= $LIBEDATASERVER_MIN_VERSION gio-2.0)
++AC_SUBST(CALENDAR_SERVER_CFLAGS)
++AC_SUBST(CALENDAR_SERVER_LIBS)
++
++GNOME_KEYBINDINGS_KEYSDIR=`$PKG_CONFIG --variable keysdir gnome-keybindings`
++AC_SUBST([GNOME_KEYBINDINGS_KEYSDIR])
++
++GOBJECT_INTROSPECTION_CHECK([$GOBJECT_INTROSPECTION_MIN_VERSION])
++
++MUTTER_GIR_DIR=`$PKG_CONFIG --variable=girdir $LIBMUTTER`
++AC_SUBST(MUTTER_GIR_DIR)
++
++MUTTER_TYPELIB_DIR=`$PKG_CONFIG --variable=typelibdir $LIBMUTTER`
++AC_SUBST(MUTTER_TYPELIB_DIR)
++
++GLIB_COMPILE_RESOURCES=`$PKG_CONFIG --variable glib_compile_resources gio-2.0`
++AC_SUBST(GLIB_COMPILE_RESOURCES)
++
++AC_CHECK_FUNCS(fdwalk)
++AC_CHECK_FUNCS(mallinfo)
++AC_CHECK_HEADERS([sys/resource.h])
++
++# _NL_TIME_FIRST_WEEKDAY is an enum and not a define
++AC_MSG_CHECKING([for _NL_TIME_FIRST_WEEKDAY])
++AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <langinfo.h>]],
++                                   [[nl_langinfo(_NL_TIME_FIRST_WEEKDAY);]])],
++               [langinfo_ok=yes], [langinfo_ok=no])
++AC_MSG_RESULT($langinfo_ok)
++if test "$langinfo_ok" = "yes"; then
++  AC_DEFINE([HAVE__NL_TIME_FIRST_WEEKDAY], [1],
++            [Define if _NL_TIME_FIRST_WEEKDAY is available])
++fi
++
++AC_ARG_ENABLE(networkmanager,
++             AS_HELP_STRING([--disable-networkmanager],
++                            [disable NetworkManager support  @<:@default=auto@:>@]),,
++              [enable_networkmanager=auto])
++
++if test "x$enable_networkmanager" != "xno"; then
++   PKG_CHECK_MODULES(NETWORKMANAGER,
++                     [libnm-glib
++                     libnm-util >= $NETWORKMANAGER_MIN_VERSION
++                     libnm-gtk >= $NETWORKMANAGER_MIN_VERSION
++                     libsecret-1 >= 0.18],
++                     [have_networkmanager=yes],
++                     [have_networkmanager=no])
++
++   GNOME_SHELL_CFLAGS="$GNOME_SHELL_CFLAGS $NETWORKMANAGER_CFLAGS"
++   GNOME_SHELL_LIBS="$GNOME_SHELL_LIBS $NETWORKMANAGER_LIBS"
++else
++   have_networkmanager="no  (disabled)"
++fi
++
++if test "x$have_networkmanager" = "xyes"; then
++   AC_DEFINE(HAVE_NETWORKMANAGER, [1], [Define if we have NetworkManager])
++   AC_SUBST([HAVE_NETWORKMANAGER], [1])
++else
++   if test "x$enable_networkmanager" = "xyes"; then
++      AC_MSG_ERROR([Couldn't find NetworkManager.])
++   fi
++   AC_SUBST([HAVE_NETWORKMANAGER], [0])
++fi
++
++AM_CONDITIONAL(HAVE_NETWORKMANAGER, test "$have_networkmanager" = "yes")
++
++# Sets GLIB_GENMARSHAL and GLIB_MKENUMS
++AM_PATH_GLIB_2_0()
++
++GTK_DOC_CHECK([1.15], [--flavour no-tmpl])
++
++AC_ARG_ENABLE(man,
++              [AS_HELP_STRING([--enable-man],
++                              [generate man pages [default=yes]])],,
++              enable_man=yes)
++if test "$enable_man" != no; then
++  AC_PATH_PROG([XSLTPROC], [xsltproc])
++  if test -z "$XSLTPROC"; then
++    AC_MSG_ERROR([xsltproc is required for --enable-man])
++  fi
++fi
++AM_CONDITIONAL(ENABLE_MAN, test "$enable_man" != no)
++
++AX_COMPILER_FLAGS()
++case "$WARN_CFLAGS" in
++    *-Werror*)
++        WARN_CFLAGS="$WARN_CFLAGS -Wno-error=deprecated-declarations"
++        ;;
++esac
++
++AM_CFLAGS="$AM_CFLAGS $WARN_CFLAGS"
++AC_SUBST(AM_CFLAGS)
++
++if test -z "${BROWSER_PLUGIN_DIR}"; then
++  BROWSER_PLUGIN_DIR="\${libdir}/mozilla/plugins"
++fi
++AC_ARG_VAR([BROWSER_PLUGIN_DIR],[Where to install the plugin to])
++
++AC_ARG_VAR([GDBUS_CODEGEN],[the gdbus-codegen programme])
++AC_PATH_PROG([GDBUS_CODEGEN],[gdbus-codegen],[])
++if test -z "$GDBUS_CODEGEN"; then
++  AC_MSG_ERROR([gdbus-codegen not found])
++fi
++
++AC_PATH_PROG([SASSC],[sassc],[])
++
++AC_CONFIG_FILES([
++  Makefile
++  data/Makefile
++  docs/Makefile
++  docs/reference/Makefile
++  docs/reference/shell/Makefile
++  docs/reference/shell/version.xml
++  docs/reference/st/Makefile
++  docs/reference/st/version.xml
++  js/Makefile
++  src/Makefile
++  subprojects/gvc/Makefile
++  browser-plugin/Makefile
++  tests/Makefile
++  po/Makefile.in
++  man/Makefile
++])
++AC_OUTPUT
++
++echo "
++Build configuration:
++
++       Prefix:                                 ${prefix}
++       Source code location:                   ${srcdir}
++       Compiler:                               ${CC}
++       Compiler Warnings:                      $ax_enable_compile_warnings
++
++       Support for NetworkManager:             $have_networkmanager
++       Support for GStreamer recording:        $build_recorder
++"
+diff --git a/data/Makefile.am b/data/Makefile.am
+new file mode 100644
+index 000000000..8c01e49d1
+--- /dev/null
++++ b/data/Makefile.am
+@@ -0,0 +1,136 @@
++CLEANFILES =
++NULL =
++
++portaldir = $(datadir)/xdg-desktop-portal/portals
++portal_DATA = gnome-shell.portal
++
++desktopdir=$(datadir)/applications
++desktop_DATA = org.gnome.Shell.desktop gnome-shell-extension-prefs.desktop
++
++if HAVE_NETWORKMANAGER
++desktop_DATA += org.gnome.Shell.PortalHelper.desktop
++
++servicedir = $(datadir)/dbus-1/services
++service_DATA = org.gnome.Shell.PortalHelper.service
++
++CLEANFILES += \
++	org.gnome.Shell.PortalHelper.service 	\
++	org.gnome.Shell.PortalHelper.desktop 	\
++	org.gnome.Shell.PortalHelper.desktop.in \
++	$(NULL)
++
++endif
++
++%.service: %.service.in
++	$(AM_V_GEN) sed -e "s|@libexecdir[@]|$(libexecdir)|" \
++	    $< > $@ || rm $@
++
++# We substitute in bindir so it works as an autostart
++# file when built in a non-system prefix
++%.desktop.in:%.desktop.in.in
++	$(AM_V_GEN) sed -e "s|@bindir[@]|$(bindir)|" \
++	    -e "s|@VERSION[@]|$(VERSION)|" \
++	    $< > $@ || rm $@
++
++%.desktop:%.desktop.in
++	$(AM_V_GEN) $(MSGFMT) --desktop --template $(builddir)/$< \
++	                      -d $(top_srcdir)/po -o $@
++
++introspectiondir = $(datadir)/dbus-1/interfaces
++introspection_DATA =				\
++	org.gnome.Shell.PadOsd.xml		\
++	org.gnome.Shell.Screencast.xml		\
++	org.gnome.Shell.Screenshot.xml		\
++	org.gnome.ShellSearchProvider.xml	\
++	org.gnome.ShellSearchProvider2.xml	\
++	$(NULL)
++
++theme_sources = 						\
++	theme/gnome-shell-high-contrast.scss			\
++	theme/gnome-shell.scss					\
++	theme/gnome-shell-sass/_colors.scss			\
++	theme/gnome-shell-sass/_common.scss			\
++	theme/gnome-shell-sass/_drawing.scss			\
++	theme/gnome-shell-sass/_high-contrast-colors.scss	\
++	$(NULL)
++
++dist_theme_files =						\
++	$(theme_sources)					\
++	theme/HACKING						\
++	theme/README						\
++	theme/gnome-shell-sass/COPYING				\
++	theme/gnome-shell-sass/HACKING				\
++	theme/gnome-shell-sass/NEWS				\
++	theme/gnome-shell-sass/README				\
++	theme/gnome-shell-sass/gnome-shell-sass.doap		\
++	theme/pad-osd.css					\
++	theme/parse-sass.sh					\
++	$(NULL)
++
++%.css: %.scss $(theme_sources)
++	@if test -n "$(SASSC)"; then \
++		if $(AM_V_P); then PS4= set -x; else echo "  GEN      $@"; fi; \
++		$(SASSC) -a $< $@; \
++	fi
++
++resource_files = $(shell $(GLIB_COMPILE_RESOURCES) --sourcedir=$(srcdir)/theme --generate-dependencies $(srcdir)/gnome-shell-theme.gresource.xml)
++gnome-shell-theme.gresource: gnome-shell-theme.gresource.xml $(resource_files)
++	$(AM_V_GEN) $(GLIB_COMPILE_RESOURCES) --target=$@ --sourcedir=$(srcdir)/theme $<
++resourcedir = $(pkgdatadir)
++resource_DATA = gnome-shell-theme.gresource
++
++backgrounddir = $(pkgdatadir)
++background_DATA = perf-background.xml
++
++perf-background.xml: perf-background.xml.in
++	$(AM_V_GEN) sed -e "s|@datadir[@]|$(datadir)|" \
++	    $< > $@ || rm $@
++
++keysdir = @GNOME_KEYBINDINGS_KEYSDIR@
++keys_DATA = 50-gnome-shell-system.xml
++
++gsettings_SCHEMAS = org.gnome.shell.gschema.xml
++
++%.gschema.xml: %.gschema.xml.in Makefile
++	$(AM_V_GEN) sed -e 's|@GETTEXT_PACKAGE[@]|$(GETTEXT_PACKAGE)|g' \
++	$< > $@ || rm $@
++
++@GSETTINGS_RULES@
++
++# We need to compile schemas at make time
++# to run from source tree
++gschemas.compiled: $(gsettings_SCHEMAS:.xml=.valid)
++	$(AM_V_GEN) $(GLIB_COMPILE_SCHEMAS) --targetdir=. .
++
++all-local: gschemas.compiled
++
++convertdir = $(datadir)/GConf/gsettings
++convert_DATA = gnome-shell-overrides.convert
++
++EXTRA_DIST =						\
++	org.gnome.Shell.desktop.in.in			\
++	gnome-shell-extension-prefs.desktop.in.in	\
++	$(portal_DATA)					\
++	$(introspection_DATA)				\
++	$(menu_DATA)					\
++	$(convert_DATA)					\
++	$(keys_DATA)					\
++	$(dist_theme_files)				\
++	perf-background.xml.in				\
++	org.gnome.Shell.PortalHelper.desktop.in.in	\
++	org.gnome.Shell.PortalHelper.service.in		\
++	org.gnome.shell.gschema.xml.in			\
++	gnome-shell-theme.gresource.xml 		\
++	$(resource_files)				\
++	$(NULL)
++
++CLEANFILES +=						\
++	org.gnome.Shell.desktop.in			\
++	gnome-shell-extension-prefs.in			\
++	$(desktop_DATA)					\
++	$(gsettings_SCHEMAS)				\
++	perf-background.xml				\
++	gschemas.compiled				\
++	org.gnome.shell.gschema.valid			\
++	gnome-shell-theme.gresource			\
++	$(NULL)
+diff --git a/docs/Makefile.am b/docs/Makefile.am
+new file mode 100644
+index 000000000..f3ddc22dd
+--- /dev/null
++++ b/docs/Makefile.am
+@@ -0,0 +1 @@
++SUBDIRS = reference
+diff --git a/docs/reference/Makefile.am b/docs/reference/Makefile.am
+new file mode 100644
+index 000000000..2721dc0e0
+--- /dev/null
++++ b/docs/reference/Makefile.am
+@@ -0,0 +1 @@
++SUBDIRS = shell st
+diff --git a/docs/reference/shell/Makefile.am b/docs/reference/shell/Makefile.am
+new file mode 100644
+index 000000000..715e3f26c
+--- /dev/null
++++ b/docs/reference/shell/Makefile.am
+@@ -0,0 +1,139 @@
++## Process this file with automake to produce Makefile.in
++
++# We require automake 1.6 at least.
++AUTOMAKE_OPTIONS = 1.6
++
++# This is a blank Makefile.am for using gtk-doc.
++# Copy this to your project's API docs directory and modify the variables to
++# suit your project. See the GTK+ Makefiles in gtk+/docs/reference for examples
++# of using the various options.
++
++# The name of the module, e.g. 'glib'.
++DOC_MODULE=shell
++
++# Uncomment for versioned docs and specify the version of the module, e.g. '2'.
++#DOC_MODULE_VERSION=2
++
++
++# The top-level SGML file. You can change this if you want to.
++DOC_MAIN_SGML_FILE=$(DOC_MODULE)-docs.sgml
++
++# Directories containing the source code
++# gtk-doc will search all .c and .h files beneath these paths
++# for inline comments documenting functions and macros.
++DOC_SOURCE_DIR=$(top_srcdir)/src
++
++# Extra options to pass to gtkdoc-scangobj. Not normally needed.
++SCANGOBJ_OPTIONS=
++
++# Extra options to supply to gtkdoc-scan.
++# e.g. SCAN_OPTIONS=--deprecated-guards="GTK_DISABLE_DEPRECATED"
++SCAN_OPTIONS=--rebuild-types
++
++# Extra options to supply to gtkdoc-mkdb.
++# e.g. MKDB_OPTIONS=--xml-mode --output-format=xml
++MKDB_OPTIONS=--xml-mode --output-format=xml
++
++# Extra options to supply to gtkdoc-mktmpl
++# e.g. MKTMPL_OPTIONS=--only-section-tmpl
++MKTMPL_OPTIONS=
++
++# Extra options to supply to gtkdoc-mkhtml
++MKHTML_OPTIONS=
++
++# Extra options to supply to gtkdoc-fixref. Not normally needed.
++# e.g. FIXXREF_OPTIONS=--extra-dir=../gdk-pixbuf/html --extra-dir=../gdk/html
++FIXXREF_OPTIONS=
++
++# Used for dependencies. The docs will be rebuilt if any of these change.
++# e.g. HFILE_GLOB=$(top_srcdir)/gtk/*.h
++# e.g. CFILE_GLOB=$(top_srcdir)/gtk/*.c
++HFILE_GLOB=$(top_srcdir)/src/*.h
++CFILE_GLOB=$(top_srcdir)/src/*.c
++
++# Extra header to include when scanning, which are not under DOC_SOURCE_DIR
++# e.g. EXTRA_HFILES=$(top_srcdir}/contrib/extra.h
++EXTRA_HFILES=
++
++# Header files or dirs to ignore when scanning. Use base file/dir names
++# e.g. IGNORE_HFILES=gtkdebug.h gtkintl.h private_code
++IGNORE_HFILES=					\
++	calendar-server				\
++	gvc					\
++	hotplug-sniffer				\
++	st					\
++	tray					\
++	gactionmuxer.h				\
++	gactionobservable.h			\
++	gactionobserver.h			\
++	shell-network-agent.h			\
++	shell-recorder-src.h
++
++if !BUILD_RECORDER
++IGNORE_HFILES += shell-recorder.h
++endif
++
++# Images to copy into HTML directory.
++# e.g. HTML_IMAGES=$(top_srcdir)/gtk/stock-icons/stock_about_24.png
++HTML_IMAGES=
++
++doc-gen-org.gnome.Shell.SearchProvider.xml: $(top_srcdir)/data/org.gnome.ShellSearchProvider.xml
++	gdbus-codegen 						\
++	--interface-prefix org.gnome.ShellSearchProvider. 	\
++	--generate-docbook doc-gen				\
++	$(top_srcdir)/data/org.gnome.ShellSearchProvider.xml
++
++doc-gen-org.gnome.Shell.SearchProvider2.xml: $(top_srcdir)/data/org.gnome.ShellSearchProvider2.xml
++	gdbus-codegen 						\
++	--interface-prefix org.gnome.ShellSearchProvider2. 	\
++	--generate-docbook doc-gen				\
++	$(top_srcdir)/data/org.gnome.ShellSearchProvider2.xml
++
++doc-gen-org.gnome.Shell.Screenshot.xml: $(top_srcdir)/data/org.gnome.Shell.Screenshot.xml
++	gdbus-codegen 						\
++	--interface-prefix org.gnome.Shell.Screenshot.		\
++	--generate-docbook doc-gen				\
++	$(top_srcdir)/data/org.gnome.Shell.Screenshot.xml
++
++# Extra SGML files that are included by $(DOC_MAIN_SGML_FILE).
++# e.g. content_files=running.sgml building.sgml changes-2.0.sgml
++content_files= \
++	doc-gen-org.gnome.Shell.SearchProvider.xml	\
++	doc-gen-org.gnome.Shell.SearchProvider2.xml	\
++	doc-gen-org.gnome.Shell.Screenshot.xml
++
++# SGML files where gtk-doc abbrevations (#GtkWidget) are expanded
++# These files must be listed here *and* in content_files
++# e.g. expand_content_files=running.sgml
++expand_content_files=
++
++# CFLAGS and LDFLAGS for compiling gtkdoc-scangobj with your library.
++# Only needed if you are using gtkdoc-scangobj to dynamically query widget
++# signals and properties.
++# e.g. GTKDOC_CFLAGS=-I$(top_srcdir) -I$(top_builddir) $(GTK_DEBUG_FLAGS)
++# e.g. GTKDOC_LIBS=$(top_builddir)/gtk/$(gtktargetlib)
++GTKDOC_CFLAGS=$(GNOME_SHELL_CFLAGS)
++GTKDOC_LIBS=$(GNOME_SHELL_LIBS) $(top_builddir)/src/libgnome-shell-menu.la $(top_builddir)/src/libgnome-shell.la -rpath $(MUTTER_TYPELIB_DIR)
++
++# This includes the standard gtk-doc make rules, copied by gtkdocize.
++include $(top_srcdir)/gtk-doc.make
++
++# Other files to distribute
++# e.g. EXTRA_DIST += version.xml.in
++EXTRA_DIST += version.xml.in
++
++# Files not to distribute
++# for --rebuild-types in $(SCAN_OPTIONS), e.g. $(DOC_MODULE).types
++# for --rebuild-sections in $(SCAN_OPTIONS) e.g. $(DOC_MODULE)-sections.txt
++DISTCLEANFILES = $(DOC_MODULE).types
++
++# Comment this out if you want 'make check' to test you doc status
++# and run some sanity checks
++if ENABLE_GTK_DOC
++TESTS_ENVIRONMENT = cd $(srcdir) && \
++  DOC_MODULE=$(DOC_MODULE) DOC_MAIN_SGML_FILE=$(DOC_MAIN_SGML_FILE) \
++  SRCDIR=$(abs_srcdir) BUILDDIR=$(abs_builddir)
++#TESTS = $(GTKDOC_CHECK)
++endif
++
++-include $(top_srcdir)/git.mk
+diff --git a/docs/reference/st/Makefile.am b/docs/reference/st/Makefile.am
+new file mode 100644
+index 000000000..df2d357d5
+--- /dev/null
++++ b/docs/reference/st/Makefile.am
+@@ -0,0 +1,104 @@
++## Process this file with automake to produce Makefile.in
++
++# We require automake 1.6 at least.
++AUTOMAKE_OPTIONS = 1.6
++
++# This is a blank Makefile.am for using gtk-doc.
++# Copy this to your project's API docs directory and modify the variables to
++# suit your project. See the GTK+ Makefiles in gtk+/docs/reference for examples
++# of using the various options.
++
++# The name of the module, e.g. 'glib'.
++DOC_MODULE=st
++
++# Uncomment for versioned docs and specify the version of the module, e.g. '2'.
++#DOC_MODULE_VERSION=2
++
++
++# The top-level SGML file. You can change this if you want to.
++DOC_MAIN_SGML_FILE=$(DOC_MODULE)-docs.sgml
++
++# Directories containing the source code
++# gtk-doc will search all .c and .h files beneath these paths
++# for inline comments documenting functions and macros.
++DOC_SOURCE_DIR=$(top_srcdir)/src/st
++
++# Extra options to pass to gtkdoc-scangobj. Not normally needed.
++SCANGOBJ_OPTIONS=
++
++# Extra options to supply to gtkdoc-scan.
++# e.g. SCAN_OPTIONS=--deprecated-guards="GTK_DISABLE_DEPRECATED"
++SCAN_OPTIONS=--rebuild-types --rebuild-sections
++
++# Extra options to supply to gtkdoc-mkdb.
++# e.g. MKDB_OPTIONS=--xml-mode --output-format=xml
++MKDB_OPTIONS=--xml-mode --output-format=xml
++
++# Extra options to supply to gtkdoc-mktmpl
++# e.g. MKTMPL_OPTIONS=--only-section-tmpl
++MKTMPL_OPTIONS=
++
++# Extra options to supply to gtkdoc-mkhtml
++MKHTML_OPTIONS=
++
++# Extra options to supply to gtkdoc-fixref. Not normally needed.
++# e.g. FIXXREF_OPTIONS=--extra-dir=../gdk-pixbuf/html --extra-dir=../gdk/html
++FIXXREF_OPTIONS=
++
++# Used for dependencies. The docs will be rebuilt if any of these change.
++# e.g. HFILE_GLOB=$(top_srcdir)/gtk/*.h
++# e.g. CFILE_GLOB=$(top_srcdir)/gtk/*.c
++HFILE_GLOB=$(top_srcdir)/src/st/*.h
++CFILE_GLOB=$(top_srcdir)/src/st/*.c
++
++# Extra header to include when scanning, which are not under DOC_SOURCE_DIR
++# e.g. EXTRA_HFILES=$(top_srcdir}/contrib/extra.h
++EXTRA_HFILES=
++
++# Header files or dirs to ignore when scanning. Use base file/dir names
++# e.g. IGNORE_HFILES=gtkdebug.h gtkintl.h private_code
++IGNORE_HFILES=st-private.h st-theme-node-private.h
++
++# Images to copy into HTML directory.
++# e.g. HTML_IMAGES=$(top_srcdir)/gtk/stock-icons/stock_about_24.png
++HTML_IMAGES=
++
++# Extra SGML files that are included by $(DOC_MAIN_SGML_FILE).
++# e.g. content_files=running.sgml building.sgml changes-2.0.sgml
++content_files=
++
++# SGML files where gtk-doc abbrevations (#GtkWidget) are expanded
++# These files must be listed here *and* in content_files
++# e.g. expand_content_files=running.sgml
++expand_content_files=
++
++# CFLAGS and LDFLAGS for compiling gtkdoc-scangobj with your library.
++# Only needed if you are using gtkdoc-scangobj to dynamically query widget
++# signals and properties.
++# e.g. GTKDOC_CFLAGS=-I$(top_srcdir) -I$(top_builddir) $(GTK_DEBUG_FLAGS)
++# e.g. GTKDOC_LIBS=$(top_builddir)/gtk/$(gtktargetlib)
++GTKDOC_CFLAGS=
++GTKDOC_LIBS=$(top_builddir)/src/libst-1.0.la -rpath $(MUTTER_TYPELIB_DIR)
++
++# This includes the standard gtk-doc make rules, copied by gtkdocize.
++include $(top_srcdir)/gtk-doc.make
++
++# Other files to distribute
++# e.g. EXTRA_DIST += version.xml.in
++EXTRA_DIST += version.xml.in
++
++# Files not to distribute
++# for --rebuild-types in $(SCAN_OPTIONS), e.g. $(DOC_MODULE).types
++# for --rebuild-sections in $(SCAN_OPTIONS) e.g. $(DOC_MODULE)-sections.txt
++DISTCLEANFILES = $(DOC_MODULE).types $(DOC_MODULE)-sections.txt
++
++# Comment this out if you want 'make check' to test you doc status
++# and run some sanity checks
++if ENABLE_GTK_DOC
++TESTS_ENVIRONMENT = cd $(srcdir) && \
++  DOC_MODULE=$(DOC_MODULE) DOC_MAIN_SGML_FILE=$(DOC_MAIN_SGML_FILE) \
++  SRCDIR=$(abs_srcdir) BUILDDIR=$(abs_builddir)
++#TESTS = $(GTKDOC_CHECK)
++endif
++
++-include $(top_srcdir)/git.mk
+diff --git a/gtk-doc.make b/gtk-doc.make
+new file mode 100644
+index 000000000..e4a12a5b2
+--- /dev/null
++++ b/gtk-doc.make
+@@ -0,0 +1,304 @@
++# -*- mode: makefile -*-
++
++####################################
++# Everything below here is generic #
++####################################
++
++if GTK_DOC_USE_LIBTOOL
++GTKDOC_CC = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(INCLUDES) $(GTKDOC_DEPS_CFLAGS) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
++GTKDOC_LD = $(LIBTOOL) --tag=CC --mode=link $(CC) $(GTKDOC_DEPS_LIBS) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS)
++GTKDOC_RUN = $(LIBTOOL) --mode=execute
++else
++GTKDOC_CC = $(CC) $(INCLUDES) $(GTKDOC_DEPS_CFLAGS) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
++GTKDOC_LD = $(CC) $(GTKDOC_DEPS_LIBS) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS)
++GTKDOC_RUN =
++endif
++
++# We set GPATH here; this gives us semantics for GNU make
++# which are more like other make's VPATH, when it comes to
++# whether a source that is a target of one rule is then
++# searched for in VPATH/GPATH.
++#
++GPATH = $(srcdir)
++
++TARGET_DIR=$(HTML_DIR)/$(DOC_MODULE)
++
++SETUP_FILES = \
++	$(content_files)		\
++	$(expand_content_files)		\
++	$(DOC_MAIN_SGML_FILE)		\
++	$(DOC_MODULE)-sections.txt	\
++	$(DOC_MODULE)-overrides.txt
++
++EXTRA_DIST = 				\
++	$(HTML_IMAGES)			\
++	$(SETUP_FILES)
++
++DOC_STAMPS=setup-build.stamp scan-build.stamp sgml-build.stamp \
++	html-build.stamp pdf-build.stamp \
++	sgml.stamp html.stamp pdf.stamp
++
++SCANOBJ_FILES = 		 \
++	$(DOC_MODULE).args 	 \
++	$(DOC_MODULE).hierarchy  \
++	$(DOC_MODULE).interfaces \
++	$(DOC_MODULE).prerequisites \
++	$(DOC_MODULE).signals
++
++REPORT_FILES = \
++	$(DOC_MODULE)-undocumented.txt \
++	$(DOC_MODULE)-undeclared.txt \
++	$(DOC_MODULE)-unused.txt
++
++gtkdoc-check.test: Makefile
++	$(AM_V_GEN)echo "#!/bin/sh -e" > $@; \
++		echo "$(GTKDOC_CHECK_PATH) || exit 1" >> $@; \
++		chmod +x $@
++
++CLEANFILES = $(SCANOBJ_FILES) $(REPORT_FILES) $(DOC_STAMPS) gtkdoc-check.test
++
++if GTK_DOC_BUILD_HTML
++HTML_BUILD_STAMP=html-build.stamp
++else
++HTML_BUILD_STAMP=
++endif
++if GTK_DOC_BUILD_PDF
++PDF_BUILD_STAMP=pdf-build.stamp
++else
++PDF_BUILD_STAMP=
++endif
++
++all-gtk-doc: $(HTML_BUILD_STAMP) $(PDF_BUILD_STAMP)
++.PHONY: all-gtk-doc
++
++if ENABLE_GTK_DOC
++all-local: all-gtk-doc
++endif
++
++docs: $(HTML_BUILD_STAMP) $(PDF_BUILD_STAMP)
++
++$(REPORT_FILES): sgml-build.stamp
++
++#### setup ####
++
++GTK_DOC_V_SETUP=$(GTK_DOC_V_SETUP_$(V))
++GTK_DOC_V_SETUP_=$(GTK_DOC_V_SETUP_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_SETUP_0=@echo "  DOC   Preparing build";
++
++setup-build.stamp:
++	-$(GTK_DOC_V_SETUP)if test "$(abs_srcdir)" != "$(abs_builddir)" ; then \
++	    files=`echo $(SETUP_FILES) $(DOC_MODULE).types`; \
++	    if test "x$$files" != "x" ; then \
++	        for file in $$files ; do \
++	            destdir=`dirname $(abs_builddir)/$$file`; \
++	            test -d "$$destdir" || mkdir -p "$$destdir"; \
++	            test -f $(abs_srcdir)/$$file && \
++	                cp -pf $(abs_srcdir)/$$file $(abs_builddir)/$$file || true; \
++	        done; \
++	    fi; \
++	fi
++	$(AM_V_at)touch setup-build.stamp
++
++
++#### scan ####
++
++GTK_DOC_V_SCAN=$(GTK_DOC_V_SCAN_$(V))
++GTK_DOC_V_SCAN_=$(GTK_DOC_V_SCAN_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_SCAN_0=@echo "  DOC   Scanning header files";
++
++GTK_DOC_V_INTROSPECT=$(GTK_DOC_V_INTROSPECT_$(V))
++GTK_DOC_V_INTROSPECT_=$(GTK_DOC_V_INTROSPECT_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_INTROSPECT_0=@echo "  DOC   Introspecting gobjects";
++
++scan-build.stamp: setup-build.stamp $(HFILE_GLOB) $(CFILE_GLOB)
++	$(GTK_DOC_V_SCAN)_source_dir='' ; \
++	for i in $(DOC_SOURCE_DIR) ; do \
++	    _source_dir="$${_source_dir} --source-dir=$$i" ; \
++	done ; \
++	gtkdoc-scan --module=$(DOC_MODULE) --ignore-headers="$(IGNORE_HFILES)" $${_source_dir} $(SCAN_OPTIONS) $(EXTRA_HFILES)
++	$(GTK_DOC_V_INTROSPECT)if grep -l '^..*$$' $(DOC_MODULE).types > /dev/null 2>&1 ; then \
++	    scanobj_options=""; \
++	    gtkdoc-scangobj 2>&1 --help | grep  >/dev/null "\-\-verbose"; \
++	    if test "$$?" = "0"; then \
++	        if test "x$(V)" = "x1"; then \
++	            scanobj_options="--verbose"; \
++	        fi; \
++	    fi; \
++	    CC="$(GTKDOC_CC)" LD="$(GTKDOC_LD)" RUN="$(GTKDOC_RUN)" CFLAGS="$(GTKDOC_CFLAGS) $(CFLAGS)" LDFLAGS="$(GTKDOC_LIBS) $(LDFLAGS)" \
++	    gtkdoc-scangobj $(SCANGOBJ_OPTIONS) $$scanobj_options --module=$(DOC_MODULE); \
++	else \
++	    for i in $(SCANOBJ_FILES) ; do \
++	        test -f $$i || touch $$i ; \
++	    done \
++	fi
++	$(AM_V_at)touch scan-build.stamp
++
++$(DOC_MODULE)-decl.txt $(SCANOBJ_FILES) $(DOC_MODULE)-sections.txt $(DOC_MODULE)-overrides.txt: scan-build.stamp
++	@true
++
++#### xml ####
++
++GTK_DOC_V_XML=$(GTK_DOC_V_XML_$(V))
++GTK_DOC_V_XML_=$(GTK_DOC_V_XML_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_XML_0=@echo "  DOC   Building XML";
++
++sgml-build.stamp: setup-build.stamp $(DOC_MODULE)-decl.txt $(SCANOBJ_FILES) $(HFILE_GLOB) $(CFILE_GLOB) $(DOC_MODULE)-sections.txt $(DOC_MODULE)-overrides.txt $(expand_content_files) xml/gtkdocentities.ent
++	$(GTK_DOC_V_XML)_source_dir='' ; \
++	for i in $(DOC_SOURCE_DIR) ; do \
++	    _source_dir="$${_source_dir} --source-dir=$$i" ; \
++	done ; \
++	gtkdoc-mkdb --module=$(DOC_MODULE) --output-format=xml --expand-content-files="$(expand_content_files)" --main-sgml-file=$(DOC_MAIN_SGML_FILE) $${_source_dir} $(MKDB_OPTIONS)
++	$(AM_V_at)touch sgml-build.stamp
++
++sgml.stamp: sgml-build.stamp
++	@true
++
++xml/gtkdocentities.ent: Makefile
++	$(GTK_DOC_V_XML)$(MKDIR_P) $(@D) && ( \
++		echo "<!ENTITY package \"$(PACKAGE)\">"; \
++		echo "<!ENTITY package_bugreport \"$(PACKAGE_BUGREPORT)\">"; \
++		echo "<!ENTITY package_name \"$(PACKAGE_NAME)\">"; \
++		echo "<!ENTITY package_string \"$(PACKAGE_STRING)\">"; \
++		echo "<!ENTITY package_tarname \"$(PACKAGE_TARNAME)\">"; \
++		echo "<!ENTITY package_url \"$(PACKAGE_URL)\">"; \
++		echo "<!ENTITY package_version \"$(PACKAGE_VERSION)\">"; \
++	) > $@
++
++#### html ####
++
++GTK_DOC_V_HTML=$(GTK_DOC_V_HTML_$(V))
++GTK_DOC_V_HTML_=$(GTK_DOC_V_HTML_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_HTML_0=@echo "  DOC   Building HTML";
++
++GTK_DOC_V_XREF=$(GTK_DOC_V_XREF_$(V))
++GTK_DOC_V_XREF_=$(GTK_DOC_V_XREF_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_XREF_0=@echo "  DOC   Fixing cross-references";
++
++html-build.stamp: sgml.stamp $(DOC_MAIN_SGML_FILE) $(content_files) $(expand_content_files)
++	$(GTK_DOC_V_HTML)rm -rf html && mkdir html && \
++	mkhtml_options=""; \
++	gtkdoc-mkhtml 2>&1 --help | grep  >/dev/null "\-\-verbose"; \
++	if test "$$?" = "0"; then \
++	  if test "x$(V)" = "x1"; then \
++	    mkhtml_options="$$mkhtml_options --verbose"; \
++	  fi; \
++	fi; \
++	gtkdoc-mkhtml 2>&1 --help | grep  >/dev/null "\-\-path"; \
++	if test "$$?" = "0"; then \
++	  mkhtml_options="$$mkhtml_options --path=\"$(abs_srcdir)\""; \
++	fi; \
++	cd html && gtkdoc-mkhtml $$mkhtml_options $(MKHTML_OPTIONS) $(DOC_MODULE) ../$(DOC_MAIN_SGML_FILE)
++	-@test "x$(HTML_IMAGES)" = "x" || \
++	for file in $(HTML_IMAGES) ; do \
++	  if test -f $(abs_srcdir)/$$file ; then \
++	    cp $(abs_srcdir)/$$file $(abs_builddir)/html; \
++	  fi; \
++	  if test -f $(abs_builddir)/$$file ; then \
++	    cp $(abs_builddir)/$$file $(abs_builddir)/html; \
++	  fi; \
++	done;
++	$(GTK_DOC_V_XREF)gtkdoc-fixxref --module=$(DOC_MODULE) --module-dir=html --html-dir=$(HTML_DIR) $(FIXXREF_OPTIONS)
++	$(AM_V_at)touch html-build.stamp
++
++#### pdf ####
++
++GTK_DOC_V_PDF=$(GTK_DOC_V_PDF_$(V))
++GTK_DOC_V_PDF_=$(GTK_DOC_V_PDF_$(AM_DEFAULT_VERBOSITY))
++GTK_DOC_V_PDF_0=@echo "  DOC   Building PDF";
++
++pdf-build.stamp: sgml.stamp $(DOC_MAIN_SGML_FILE) $(content_files) $(expand_content_files)
++	$(GTK_DOC_V_PDF)rm -f $(DOC_MODULE).pdf && \
++	mkpdf_options=""; \
++	gtkdoc-mkpdf 2>&1 --help | grep  >/dev/null "\-\-verbose"; \
++	if test "$$?" = "0"; then \
++	  if test "x$(V)" = "x1"; then \
++	    mkpdf_options="$$mkpdf_options --verbose"; \
++	  fi; \
++	fi; \
++	if test "x$(HTML_IMAGES)" != "x"; then \
++	  for img in $(HTML_IMAGES); do \
++	    part=`dirname $$img`; \
++	    echo $$mkpdf_options | grep >/dev/null "\-\-imgdir=$$part "; \
++	    if test $$? != 0; then \
++	      mkpdf_options="$$mkpdf_options --imgdir=$$part"; \
++	    fi; \
++	  done; \
++	fi; \
++	gtkdoc-mkpdf --path="$(abs_srcdir)" $$mkpdf_options $(DOC_MODULE) $(DOC_MAIN_SGML_FILE) $(MKPDF_OPTIONS)
++	$(AM_V_at)touch pdf-build.stamp
++
++##############
++
++clean-local:
++	@rm -f *~ *.bak
++	@rm -rf .libs
++	@if echo $(SCAN_OPTIONS) | grep -q "\-\-rebuild-types" ; then \
++	  rm -f $(DOC_MODULE).types; \
++	fi
++	@if echo $(SCAN_OPTIONS) | grep -q "\-\-rebuild-sections" ; then \
++	  rm -f $(DOC_MODULE)-sections.txt; \
++	fi
++
++distclean-local:
++	@rm -rf xml html $(REPORT_FILES) $(DOC_MODULE).pdf \
++	    $(DOC_MODULE)-decl-list.txt $(DOC_MODULE)-decl.txt
++	@if test "$(abs_srcdir)" != "$(abs_builddir)" ; then \
++	    rm -f $(SETUP_FILES) $(DOC_MODULE).types; \
++	fi
++
++maintainer-clean-local:
++	@rm -rf xml html
++
++install-data-local:
++	@installfiles=`echo $(builddir)/html/*`; \
++	if test "$$installfiles" = '$(builddir)/html/*'; \
++	then echo 1>&2 'Nothing to install' ; \
++	else \
++	  if test -n "$(DOC_MODULE_VERSION)"; then \
++	    installdir="$(DESTDIR)$(TARGET_DIR)-$(DOC_MODULE_VERSION)"; \
++	  else \
++	    installdir="$(DESTDIR)$(TARGET_DIR)"; \
++	  fi; \
++	  $(mkinstalldirs) $${installdir} ; \
++	  for i in $$installfiles; do \
++	    echo ' $(INSTALL_DATA) '$$i ; \
++	    $(INSTALL_DATA) $$i $${installdir}; \
++	  done; \
++	  if test -n "$(DOC_MODULE_VERSION)"; then \
++	    mv -f $${installdir}/$(DOC_MODULE).devhelp2 \
++	      $${installdir}/$(DOC_MODULE)-$(DOC_MODULE_VERSION).devhelp2; \
++	  fi; \
++	  $(GTKDOC_REBASE) --relative --dest-dir=$(DESTDIR) --html-dir=$${installdir}; \
++	fi
++
++uninstall-local:
++	@if test -n "$(DOC_MODULE_VERSION)"; then \
++	  installdir="$(DESTDIR)$(TARGET_DIR)-$(DOC_MODULE_VERSION)"; \
++	else \
++	  installdir="$(DESTDIR)$(TARGET_DIR)"; \
++	fi; \
++	rm -rf $${installdir}
++
++#
++# Require gtk-doc when making dist
++#
++if HAVE_GTK_DOC
++dist-check-gtkdoc: docs
++else
++dist-check-gtkdoc:
++	@echo "*** gtk-doc is needed to run 'make dist'.         ***"
++	@echo "*** gtk-doc was not found when 'configure' ran.   ***"
++	@echo "*** please install gtk-doc and rerun 'configure'. ***"
++	@false
++endif
++
++dist-hook: dist-check-gtkdoc all-gtk-doc dist-hook-local
++	@mkdir $(distdir)/html
++	@cp ./html/* $(distdir)/html
++	@-cp ./$(DOC_MODULE).pdf $(distdir)/
++	@-cp ./$(DOC_MODULE).types $(distdir)/
++	@-cp ./$(DOC_MODULE)-sections.txt $(distdir)/
++	@cd $(distdir) && rm -f $(DISTCLEANFILES)
++	@$(GTKDOC_REBASE) --online --relative --html-dir=$(distdir)/html
++
++.PHONY : dist-hook-local docs
+diff --git a/js/Makefile.am b/js/Makefile.am
+new file mode 100644
+index 000000000..6369c7502
+--- /dev/null
++++ b/js/Makefile.am
+@@ -0,0 +1,39 @@
++NULL =
++BUILT_SOURCES =
++
++misc/config.js: misc/config.js.in Makefile
++	[ -d $(@D) ] || $(mkdir_p) $(@D) ; \
++	sed -e "s|[@]PACKAGE_NAME@|$(PACKAGE_NAME)|g" \
++	    -e "s|[@]PACKAGE_VERSION@|$(PACKAGE_VERSION)|g" \
++	    -e "s|[@]HAVE_BLUETOOTH@|$(HAVE_BLUETOOTH)|g" \
++	    -e "s|[@]HAVE_NETWORKMANAGER@|$(HAVE_NETWORKMANAGER)|g" \
++	    -e "s|[@]GETTEXT_PACKAGE@|$(GETTEXT_PACKAGE)|g" \
++	    -e "s|[@]datadir@|$(datadir)|g" \
++	    -e "s|[@]libexecdir@|$(libexecdir)|g" \
++	    -e "s|[@]sysconfdir@|$(sysconfdir)|g" \
++	    -e "s|[@]LIBMUTTER_API_VERSION@|$(LIBMUTTER_API_VERSION)|g" \
++               $< > $@
++
++js_resource_files = $(shell $(GLIB_COMPILE_RESOURCES) --sourcedir=$(srcdir) --sourcedir=$(builddir) --generate-dependencies $(srcdir)/js-resources.gresource.xml)
++js-resources.h: js-resources.gresource.xml $(js_resource_files) misc/config.js
++	$(AM_V_GEN) $(GLIB_COMPILE_RESOURCES) --target=$@ --sourcedir=$(srcdir) --sourcedir=$(builddir) --generate --c-name shell_js_resources $<
++js-resources.c: js-resources.gresource.xml $(js_resource_files) misc/config.js
++	$(AM_V_GEN) $(GLIB_COMPILE_RESOURCES) --target=$@ --sourcedir=$(srcdir) --sourcedir=$(builddir) --generate --c-name shell_js_resources $<
++
++js_built_sources = js-resources.c js-resources.h
++
++BUILT_SOURCES += $(js_built_sources)
++
++all-local: $(js_built_sources)
++
++js_resource_dist_files = $(filter-out misc/config.js, $(js_resource_files))
++
++EXTRA_DIST = \
++	$(js_resource_dist_files) \
++	js-resources.gresource.xml \
++	misc/config.js.in \
++	$(NULL)
++
++CLEANFILES = \
++	$(js_built_sources) \
++	$(NULL)
+diff --git a/man/Makefile.am b/man/Makefile.am
+new file mode 100644
+index 000000000..166b66cf8
+--- /dev/null
++++ b/man/Makefile.am
+@@ -0,0 +1,19 @@
++XSLTPROC_FLAGS = \
++        --nonet \
++        --stringparam man.output.quietly 1 \
++        --stringparam funcsynopsis.style ansi \
++        --stringparam man.th.extra1.suppress 1 \
++        --stringparam man.authors.section.enabled 0 \
++        --stringparam man.copyright.section.enabled 0
++
++.xml.1:
++	$(AM_V_GEN) $(XSLTPROC) $(XSLTPROC_FLAGS) http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl $<
++
++man_MANS = \
++	gnome-shell.1
++
++xml_files = $(man_MANS:.1=.xml)
++
++EXTRA_DIST = $(xml_files)
++
++DISTCLEANFILES = $(man_MANS)
+diff --git a/src/Makefile.am b/src/Makefile.am
+new file mode 100644
+index 000000000..24628ccc9
+--- /dev/null
++++ b/src/Makefile.am
+@@ -0,0 +1,349 @@
++NULL = 
++BUILT_SOURCES =
++CLEANFILES =
++EXTRA_DIST =
++bin_SCRIPTS =
++libexec_PROGRAMS =
++noinst_LTLIBRARIES =
++noinst_PROGRAMS =
++service_in_files =
++
++-include $(INTROSPECTION_MAKEFILE)
++INTROSPECTION_GIRS =
++INTROSPECTION_SCANNER_ARGS = --warn-all --warn-error --add-include-path=$(srcdir) --add-include-path=$(MUTTER_GIR_DIR) -L$(MUTTER_TYPELIB_DIR)
++INTROSPECTION_COMPILER_ARGS = --includedir=$(srcdir) --includedir=$(MUTTER_TYPELIB_DIR)
++
++typelibdir = $(pkglibdir)
++typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
++
++servicedir = $(datadir)/dbus-1/services
++service_DATA = $(service_in_files:.service.in=.service)
++
++%.service: %.service.in Makefile
++	$(AM_V_GEN)									\
++		[ -d $(@D) ] || $(mkdir_p) $(@D) ;					\
++		sed -e "s|\@libexecdir\@|$(libexecdir)|" $< > $@.tmp && mv $@.tmp $@
++CLEANFILES += $(service_DATA)
++
++CLEANFILES += $(gir_DATA) $(typelib_DATA)
++
++bin_SCRIPTS += gnome-shell-extension-tool gnome-shell-perf-tool
++EXTRA_DIST += gnome-shell-extension-tool.in gnome-shell-perf-tool.in
++bin_PROGRAMS = gnome-shell gnome-shell-extension-prefs
++
++generated_script_substitutions = \
++	    -e "s|@bindir[@]|$(bindir)|g" \
++	    -e "s|@datadir[@]|$(datadir)|g" \
++	    -e "s|@libexecdir[@]|$(libexecdir)|g" \
++	    -e "s|@libdir[@]|$(libdir)|g" \
++	    -e "s|@pkglibdir[@]|$(pkglibdir)|g" \
++	    -e "s|@pkgdatadir[@]|$(pkgdatadir)|g" \
++	    -e "s|@PYTHON[@]|$(PYTHON)|g" \
++	    -e "s|@VERSION[@]|$(VERSION)|g" \
++	    -e "s|@sysconfdir[@]|$(sysconfdir)|g"
++
++gnome-shell-extension-tool: gnome-shell-extension-tool.in Makefile
++	$(AM_V_GEN) sed $(generated_script_substitutions) $< > $@.tmp && mv $@.tmp $@ && chmod a+x $@
++
++gnome-shell-perf-tool: gnome-shell-perf-tool.in Makefile
++	$(AM_V_GEN) sed $(generated_script_substitutions) $< > $@.tmp && mv $@.tmp $@ && chmod a+x $@
++
++org-gtk-application.c org-gtk-application.h: org.gtk.Application.xml Makefile
++	$(AM_V_GEN) $(GDBUS_CODEGEN) \
++			--generate-c-code org-gtk-application \
++			--c-namespace Shell \
++			$<
++
++EXTRA_DIST += org.gtk.Application.xml
++CLEANFILES += gnome-shell $(bin_SCRIPTS)
++
++include Makefile-st.am
++include Makefile-tray.am
++include Makefile-calendar-server.am
++include Makefile-hotplug-sniffer.am
++
++gnome_shell_cflags =				\
++	$(GNOME_SHELL_CFLAGS)			\
++	-I$(srcdir)/tray			\
++	-DCLUTTER_ENABLE_EXPERIMENTAL_API	\
++	-DCOGL_ENABLE_EXPERIMENTAL_API		\
++	-DVERSION=\"$(VERSION)\"		\
++	-DLOCALEDIR=\"$(datadir)/locale\" 	\
++	-DDATADIR=\"$(datadir)\"		\
++	-DGNOME_SHELL_LIBEXECDIR=\"$(libexecdir)\"	\
++	-DGNOME_SHELL_DATADIR=\"$(pkgdatadir)\"	\
++	-DGNOME_SHELL_PKGLIBDIR=\"$(pkglibdir)\"
++
++privlibdir = $(pkglibdir)
++privlib_LTLIBRARIES = libgnome-shell-menu.la libgnome-shell.la
++
++shell_built_sources = \
++	org-gtk-application.h \
++	org-gtk-application.c \
++	shell-enum-types.h \
++	shell-enum-types.c
++
++BUILT_SOURCES += $(shell_built_sources)
++
++shell_public_headers_h =		\
++	shell-app.h			\
++	shell-app-system.h		\
++	shell-app-usage.h		\
++	shell-embedded-window.h		\
++	shell-generic-container.h	\
++	shell-glsl-quad.h		\
++	shell-gtk-embed.h		\
++	shell-global.h			\
++	shell-invert-lightness-effect.h	\
++	shell-action-modes.h		\
++	shell-mount-operation.h		\
++	shell-perf-log.h		\
++	shell-screenshot.h		\
++	shell-stack.h			\
++	shell-tray-icon.h		\
++	shell-tray-manager.h		\
++	shell-util.h			\
++	shell-window-tracker.h		\
++	shell-wm.h			\
++	$(NULL)
++
++if HAVE_NETWORKMANAGER
++shell_public_headers_h +=  shell-network-agent.h
++endif
++
++libgnome_shell_menu_la_SOURCES = 	\
++	gtkactionmuxer.h		\
++	gtkactionmuxer.c		\
++	gtkactionobservable.h		\
++	gtkactionobservable.c		\
++	gtkactionobserver.h		\
++	gtkactionobserver.c		\
++	gtkmenutrackeritem.c		\
++	gtkmenutrackeritem.h		\
++	gtkmenutracker.c		\
++	gtkmenutracker.h		\
++	$(NULL)
++
++libgnome_shell_sources =		\
++	$(shell_public_headers_h)	\
++	$(shell_private_sources)	\
++	gnome-shell-plugin.c		\
++	shell-app.c			\
++	shell-app-private.h		\
++	shell-app-system.c		\
++	shell-app-system-private.h	\
++	shell-app-usage.c		\
++	shell-embedded-window-private.h	\
++	shell-embedded-window.c		\
++	shell-generic-container.c	\
++	shell-global.c			\
++	shell-global-private.h		\
++	shell-glsl-quad.c		\
++	shell-gtk-embed.c		\
++	shell-invert-lightness-effect.c	\
++	shell-keyring-prompt.h		\
++	shell-keyring-prompt.c		\
++	shell-menu-tracker.c		\
++	shell-menu-tracker.h		\
++	shell-mount-operation.c		\
++	shell-perf-log.c		\
++	shell-polkit-authentication-agent.h	\
++	shell-polkit-authentication-agent.c	\
++	shell-screenshot.c		\
++	shell-secure-text-buffer.c	\
++	shell-secure-text-buffer.h	\
++	shell-stack.c			\
++	shell-tray-icon.c		\
++	shell-tray-manager.c		\
++	shell-util.c			\
++	shell-window-tracker.c		\
++	shell-window-tracker-private.h	\
++	shell-wm.c			\
++	shell-wm-private.h		\
++	$(NULL)
++
++if HAVE_NETWORKMANAGER
++libgnome_shell_sources +=  shell-network-agent.c
++endif
++
++
++libgnome_shell_built_sources =		\
++	$(shell_built_sources)		\
++	$(top_builddir)/js/js-resources.c		\
++	$(top_builddir)/js/js-resources.h		\
++	$(NULL)
++
++libgnome_shell_la_SOURCES = $(libgnome_shell_sources)
++nodist_libgnome_shell_la_SOURCES = $(libgnome_shell_built_sources)
++
++shell_no_gir_sources = \
++	org-gtk-application.h \
++	org-gtk-application.c
++
++libgnome_shell_la_gir_sources = \
++	$(filter-out %-private.h $(shell_private_sources) $(shell_no_gir_sources), $(shell_public_headers_h) $(libgnome_shell_sources) $(libgnome_shell_built_sources))
++
++gnome_shell_SOURCES = main.c
++gnome_shell_CPPFLAGS = \
++	-DMUTTER_TYPELIB_DIR=\"$(MUTTER_TYPELIB_DIR)\" \
++	$(MUTTER_CFLAGS) \
++	$(gnome_shell_cflags)
++
++# Here, and after, we repeat mutter and bluetooth libraries just for the rpath
++# The dependency is already pulled in by libtool
++gnome_shell_LDADD = libgnome-shell.la $(GNOME_SHELL_LIBS) $(MUTTER_LIBS)
++gnome_shell_LDFLAGS = -rpath $(MUTTER_TYPELIB_DIR)
++gnome_shell_DEPENDENCIES = libgnome-shell.la
++
++gnome_shell_extension_prefs_SOURCES = \
++	gnome-shell-extension-prefs.c \
++	$(NULL)
++nodist_gnome_shell_extension_prefs_SOURCES = \
++	$(top_builddir)/js/js-resources.c		\
++	$(top_builddir)/js/js-resources.h		\
++	$(NULL)
++gnome_shell_extension_prefs_CPPFLAGS = $(gnome_shell_cflags)
++gnome_shell_extension_prefs_LDADD = $(GNOME_SHELL_LIBS)
++gnome_shell_extension_prefs_LDFLAGS = -rpath $(MUTTER_TYPELIB_DIR)
++
++if HAVE_NETWORKMANAGER
++
++libexec_PROGRAMS += gnome-shell-portal-helper
++gnome_shell_portal_helper_SOURCES = \
++	gnome-shell-portal-helper.c \
++	$(NULL)
++nodist_gnome_shell_portal_helper_SOURCES = \
++	$(top_builddir)/js/js-resources.c		\
++	$(top_builddir)/js/js-resources.h		\
++	$(NULL)
++gnome_shell_portal_helper_CPPFLAGS = $(gnome_shell_cflags)
++gnome_shell_portal_helper_LDADD = $(GNOME_SHELL_LIBS)
++gnome_shell_portal_helper_LDFLAGS = -rpath $(MUTTER_TYPELIB_DIR)
++
++endif
++
++########################################
++
++shell_recorder_sources =        \
++	shell-recorder.c	\
++	shell-recorder.h
++
++# Custom element is an internal detail
++
++if BUILD_RECORDER
++libgnome_shell_sources += $(shell_recorder_sources)
++
++shell_recorder_private_sources =  \
++	shell-recorder-src.c	\
++	shell-recorder-src.h	\
++	$(NULL)
++
++shell_private_sources = $(shell_recorder_private_sources)
++
++endif BUILD_RECORDER
++
++########################################
++
++libexec_PROGRAMS += gnome-shell-perf-helper
++
++gnome_shell_perf_helper_SOURCES = shell-perf-helper.c
++gnome_shell_perf_helper_CPPFLAGS = $(SHELL_PERF_HELPER_CFLAGS)
++gnome_shell_perf_helper_LDADD = $(SHELL_PERF_HELPER_LIBS) -lm
++
++########################################
++
++noinst_PROGRAMS += run-js-test
++
++run_js_test_CPPFLAGS = $(MUTTER_CFLAGS) $(gnome_shell_cflags)
++run_js_test_LDADD = libgnome-shell.la $(GNOME_SHELL_JS_LIBS) $(MUTTER_LIBS)
++run_js_test_LDFLAGS = -export-dynamic -rpath $(MUTTER_TYPELIB_DIR)
++
++run_js_test_SOURCES =			\
++	run-js-test.c
++
++########################################
++
++shell-enum-types.h: stamp-shell-enum-types.h Makefile
++	@true
++stamp-shell-enum-types.h: $(srcdir)/shell-enum-types.h.in $(shell_public_headers_h)
++	$(AM_V_GEN) ( \
++	  $(GLIB_MKENUMS) \
++	    --template $< \
++	  $(addprefix $(srcdir)/,$(shell_public_headers_h)) ) > $(@F).tmp && \
++	(cmp -s $(@F).tmp shell-enum-types.h || mv $(@F).tmp shell-enum-types.h) && \
++	rm -f $(@F).tmp && \
++	echo timestamp > $(@F)
++EXTRA_DIST += shell-enum-types.h.in
++CLEANFILES += stamp-shell-enum-types.h
++
++shell-enum-types.c: $(srcdir)/shell-enum-types.c.in stamp-shell-enum-types.h
++	$(AM_V_GEN) ( \
++	  $(GLIB_MKENUMS) \
++	    --template $< \
++	  $(addprefix $(srcdir)/,$(shell_public_headers_h)) ) > $(@F).tmp && \
++	mv $(@F).tmp $(@F) && \
++	rm -f $(@F).tmp
++EXTRA_DIST += shell-enum-types.c.in
++
++gvcdir = $(top_builddir)/subprojects/gvc
++
++libgnome_shell_ldflags = -avoid-version
++libgnome_shell_libadd =		\
++	-lm			\
++	$(GNOME_SHELL_LIBS)	\
++	libgnome-shell-menu.la	\
++	libst-1.0.la       	\
++	libtray.la		\
++	$(gvcdir)/libgvc.la	\
++	$(NULL)
++
++libgnome_shell_menu_la_LDFLAGS = $(libgnome_shell_ldflags)
++libgnome_shell_menu_la_LIBADD = $(GNOME_SHELL_LIBS)
++libgnome_shell_menu_la_CPPFLAGS = $(GNOME_SHELL_CFLAGS)
++
++libgnome_shell_la_LDFLAGS = $(libgnome_shell_ldflags)
++libgnome_shell_la_LIBADD = $(GNOME_SHELL_LIBS) $(MUTTER_LIBS) $(libgnome_shell_libadd)
++libgnome_shell_la_CPPFLAGS = $(MUTTER_CFLAGS) $(gnome_shell_cflags)
++
++ShellMenu-0.1.gir: libgnome-shell-menu.la
++ShellMenu_0_1_gir_INCLUDES = Gio-2.0
++ShellMenu_0_1_gir_CFLAGS = $(libgnome_shell_menu_la_CPPFLAGS) -I $(srcdir)
++ShellMenu_0_1_gir_LIBS = libgnome-shell-menu.la
++ShellMenu_0_1_gir_FILES = \
++	gtkactionmuxer.h		\
++	gtkactionmuxer.c		\
++	gtkactionobservable.h		\
++	gtkactionobservable.c		\
++	gtkactionobserver.h		\
++	gtkactionobserver.c		\
++	gtkmenutrackeritem.c		\
++	gtkmenutrackeritem.h		\
++	$(NULL)
++ShellMenu_0_1_gir_SCANNERFLAGS = 	\
++	--namespace=ShellMenu --identifier-prefix=Gtk
++INTROSPECTION_GIRS += ShellMenu-0.1.gir
++CLEANFILES += ShellMenu-0.1.gir
++
++Shell-0.1.gir: gnome-shell St-1.0.gir ShellMenu-0.1.gir
++Shell_0_1_gir_INCLUDES = Clutter-$(LIBMUTTER_API_VERSION) ClutterX11-$(LIBMUTTER_API_VERSION) Meta-$(LIBMUTTER_API_VERSION) Soup-2.4
++if HAVE_NETWORKMANAGER
++Shell_0_1_gir_INCLUDES += NetworkManager-1.0 NMClient-1.0
++endif
++Shell_0_1_gir_CFLAGS = $(libgnome_shell_la_CPPFLAGS) -I $(srcdir)
++Shell_0_1_gir_LIBS = libgnome-shell.la
++Shell_0_1_gir_FILES = $(libgnome_shell_la_gir_sources)
++Shell_0_1_gir_SCANNERFLAGS =	\
++	--include-uninstalled=$(builddir)/St-1.0.gir \
++	--include-uninstalled=$(builddir)/ShellMenu-0.1.gir \
++	--add-include-path=$(MUTTER_GIR_DIR)
++INTROSPECTION_GIRS += Shell-0.1.gir
++CLEANFILES += Shell-0.1.gir
++
++St-1.0.gir: libst-1.0.la
++St_1_0_gir_INCLUDES = Clutter-$(LIBMUTTER_API_VERSION) Gtk-3.0
++St_1_0_gir_CFLAGS = $(st_cflags) -DST_COMPILATION
++St_1_0_gir_LIBS = libst-1.0.la
++St_1_0_gir_FILES = $(filter-out %-private.h $(st_non_gir_sources), $(addprefix $(srcdir)/,$(st_source_h))) \
++	$(addprefix $(srcdir)/,$(st_source_c))
++INTROSPECTION_GIRS += St-1.0.gir
++CLEANFILES += St-1.0.gir
+diff --git a/tests/Makefile.am b/tests/Makefile.am
+new file mode 100644
+index 000000000..22ef81d30
+--- /dev/null
++++ b/tests/Makefile.am
+@@ -0,0 +1,45 @@
++noinst_SCRIPTS = run-test.sh
++EXTRA_DIST = run-test.sh.in
++
++TEST_JS =					\
++	interactive/background-repeat.js	\
++	interactive/background-size.js		\
++	interactive/borders.js			\
++	interactive/border-radius.js		\
++	interactive/border-width.js		\
++	interactive/box-layout.js		\
++	interactive/box-shadow-animated.js	\
++	interactive/box-shadows.js		\
++	interactive/calendar.js			\
++	interactive/css-fonts.js		\
++	interactive/entry.js			\
++	interactive/gapplication.js		\
++	interactive/icons.js			\
++	interactive/inline-style.js		\
++	interactive/scrolling.js		\
++	interactive/scroll-view-sizing.js	\
++	interactive/test-title.js		\
++	interactive/transitions.js		\
++	testcommon/100-200.svg			\
++	testcommon/200-100.svg			\
++	testcommon/200-200.svg			\
++	testcommon/border-image.png		\
++	testcommon/face-plain.png		\
++	testcommon/ui.js                        \
++	unit/insertSorted.js			\
++	unit/markup.js				\
++	unit/jsParse.js				\
++	unit/url.js
++EXTRA_DIST += $(TEST_JS)
++
++TEST_MISC =					\
++	testcommon/test.css
++EXTRA_DIST += $(TEST_MISC)
++
++run-test.sh: run-test.sh.in
++	$(AM_V_GEN) sed \
++	    -e "s|@MUTTER_TYPELIB_DIR[@]|$(MUTTER_TYPELIB_DIR)|" \
++	    -e "s|@srcdir[@]|$(srcdir)|" \
++	    $< > $@ && chmod a+x $@
++
++CLEANFILES = run-test.sh
+-- 
+2.13.5
+

@@ -1,0 +1,51 @@
+From b82109bd0c04a8b050a7ad18cd4b2c1d4186fa61 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 26 Jun 2017 14:35:05 -0400
+Subject: [PATCH] loginDialog: make info messages themed
+
+They were lacking a definition before leading them to
+show up invisible.
+---
+ data/theme/gnome-shell-high-contrast.css | 6 ++++--
+ data/theme/gnome-shell.css               | 6 ++++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
+index 52dc81863..b807db8ae 100644
+--- a/data/theme/gnome-shell-high-contrast.css
++++ b/data/theme/gnome-shell-high-contrast.css
+@@ -1647,9 +1647,11 @@ StScrollBar {
+ .login-dialog-message-warning {
+   color: #f57900; }
+ 
+-.login-dialog-message-hint {
++.login-dialog-message-hint, .login-dialog-message {
++  color: #bebeb6;
+   padding-top: 0;
+-  padding-bottom: 20px; }
++  padding-bottom: 20px;
++  min-height: 2.75em; }
+ 
+ .login-dialog-user-selection-box {
+   padding: 100px 0px; }
+diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
+index a320f41a0..dd37cdf7b 100644
+--- a/data/theme/gnome-shell.css
++++ b/data/theme/gnome-shell.css
+@@ -1647,9 +1647,11 @@ StScrollBar {
+ .login-dialog-message-warning {
+   color: #f57900; }
+ 
+-.login-dialog-message-hint {
++.login-dialog-message-hint, .login-dialog-message {
++  color: #bebeb6;
+   padding-top: 0;
+-  padding-bottom: 20px; }
++  padding-bottom: 20px;
++  min-height: 2.75em; }
+ 
+ .login-dialog-user-selection-box {
+   padding: 100px 0px; }
+-- 
+2.14.2
+

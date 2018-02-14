@@ -1,0 +1,51 @@
+From 3ec91d51350bce7a139baf009f659008eb046fc8 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 15 Sep 2015 14:04:07 -0400
+Subject: [PATCH] magnifier: don't spew to console when focus moves around
+
+We currently ship at-spi2 2.8 in 7.2 but gnome-shell 3.14 which
+depends on function names shipped in later versions of at-spi2.
+
+This commit works around the problem by using the names of the functions,
+as they existed in 2.8.
+---
+ js/ui/magnifier.js | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/js/ui/magnifier.js b/js/ui/magnifier.js
+index 4e91155a5..68b24e1c2 100644
+--- a/js/ui/magnifier.js
++++ b/js/ui/magnifier.js
+@@ -724,7 +724,13 @@ var ZoomRegion = new Lang.Class({
+     },
+ 
+     _updateFocus: function(caller, event) {
+-        let component = event.source.get_component_iface();
++        let component;
++
++        if (typeof event.source.get_component_iface === 'function')
++            component = event.source.get_component_iface();
++        else if (typeof event.source.get_component === 'function')
++            component = event.source.get_component();
++
+         if (!component || event.detail1 != 1)
+             return;
+         let extents;
+@@ -741,7 +747,13 @@ var ZoomRegion = new Lang.Class({
+     },
+ 
+     _updateCaret: function(caller, event) {
+-        let text = event.source.get_text_iface();
++        let text;
++
++        if (typeof event.source.get_text_iface === 'function')
++            text = event.source.get_text_iface();
++        else if (typeof event.source.get_text === 'function')
++            text = event.source.get_text();
++
+         if (!text)
+             return;
+         let extents;
+-- 
+2.14.2
+

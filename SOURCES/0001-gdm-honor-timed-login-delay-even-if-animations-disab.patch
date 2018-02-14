@@ -1,0 +1,74 @@
+From 7f2d3668cf8c7a6b8aaab2c52f7e67ab01e5ba4d Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 18 Aug 2015 12:02:17 -0400
+Subject: [PATCH] gdm: honor timed login delay even if animations disabled
+
+gnome-shell currently initiates an automatic login attempt if
+timed login is enabled and the timed login animation completes.
+
+Unfortunately, if animations are disabled (as is the case for
+virtual machines) then the timed login animation will complete
+instantly, and timed login will proceed immediately after gnome-shell
+has noticed the user is idle for 5 seconds.
+
+This commit addresses that problem by initiating timed login and the
+animation from a main loop timeout, instead of using the tweener api.
+---
+ js/gdm/loginDialog.js | 37 +++++++++++++++++++++++++++----------
+ 1 file changed, 27 insertions(+), 10 deletions(-)
+
+diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
+index 1cae3db85..c1262b1e8 100644
+--- a/js/gdm/loginDialog.js
++++ b/js/gdm/loginDialog.js
+@@ -126,20 +126,37 @@ var UserListItem = new Lang.Class({
+         let hold = new Batch.Hold();
+ 
+         this.hideTimedLoginIndicator();
+-        Tweener.addTween(this._timedLoginIndicator,
+-                         { scale_x: 1.,
+-                           time: time,
+-                           transition: 'linear',
+-                           onComplete: function() {
+-                               hold.release();
+-                           },
+-                           onCompleteScope: this
+-                         });
++
++        let startTime = GLib.get_monotonic_time();
++
++        this._timedLoginTimeoutId = GLib.timeout_add (GLib.PRIORITY_DEFAULT,
++                                                      33,
++                                                      Lang.bind(this, function() {
++                                                          let currentTime = GLi
++.get_monotonic_time();
++                                                          let elapsedTime = (currentTime - startTime) / GLib.USEC_PER_SEC;
++                                                          this._timedLoginIndicator.scale_x = elapsedTime / time;
++                                                          log("elasped time: " + elapsedTime + " time: " + time);
++                                                          if (elapsedTime >= time) {
++                                                              log("releasing hold");
++                                                              this._timedLoginTimeoutId = 0;
++                                                              hold.release();
++                                                              return GLib.SOURCE_REMOVE;
++                                                          }
++
++                                                          return GLib.SOURCE_CONTINUE;
++                                                      }));
++
++        GLib.Source.set_name_by_id(this._timedLoginTimeoutId, '[gnome-shell] this._timedLoginTimeoutId');
++
+         return hold;
+     },
+ 
+     hideTimedLoginIndicator: function() {
+-        Tweener.removeTweens(this._timedLoginIndicator);
++        if (this._timedLoginTimeoutId) {
++            GLib.source_remove(this._timedLoginTimeoutId);
++            this._timedLoginTimeoutId = 0;
++        }
+         this._timedLoginIndicator.scale_x = 0.;
+     }
+ });
+-- 
+2.14.2
+

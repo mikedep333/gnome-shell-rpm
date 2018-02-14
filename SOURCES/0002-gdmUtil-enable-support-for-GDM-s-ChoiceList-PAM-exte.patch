@@ -1,0 +1,267 @@
+From 1383483a7c9707c2528c5a47fd71217cf253c6ff Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 17 Jul 2017 16:48:03 -0400
+Subject: [PATCH 2/2] gdmUtil: enable support for GDM's ChoiceList PAM
+ extension
+
+This commit hooks up support for GDM's ChoiceList PAM extension.
+---
+ js/gdm/authPrompt.js  | 74 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ js/gdm/loginDialog.js |  5 ++++
+ js/gdm/util.js        | 28 +++++++++++++++++++
+ js/ui/unlockDialog.js |  9 ++++++-
+ 4 files changed, 114 insertions(+), 2 deletions(-)
+
+diff --git a/js/gdm/authPrompt.js b/js/gdm/authPrompt.js
+index 366f34687..7f23f0087 100644
+--- a/js/gdm/authPrompt.js
++++ b/js/gdm/authPrompt.js
+@@ -9,6 +9,7 @@ const Signals = imports.signals;
+ const St = imports.gi.St;
+ 
+ const Animation = imports.ui.animation;
++const AuthList = imports.gdm.authList;
+ const Batch = imports.gdm.batch;
+ const GdmUtil = imports.gdm.util;
+ const Meta = imports.gi.Meta;
+@@ -61,6 +62,7 @@ var AuthPrompt = new Lang.Class({
+ 
+         this._userVerifier.connect('ask-question', Lang.bind(this, this._onAskQuestion));
+         this._userVerifier.connect('show-message', Lang.bind(this, this._onShowMessage));
++        this._userVerifier.connect('show-choice-list', Lang.bind(this, this._onShowChoiceList));
+         this._userVerifier.connect('verification-failed', Lang.bind(this, this._onVerificationFailed));
+         this._userVerifier.connect('verification-complete', Lang.bind(this, this._onVerificationComplete));
+         this._userVerifier.connect('reset', Lang.bind(this, this._onReset));
+@@ -125,6 +127,28 @@ var AuthPrompt = new Lang.Class({
+ 
+         this.actor.add(this._timedLoginIndicator);
+ 
++        this._authList = new AuthList.AuthList();
++        this._authList.connect('activate', (list, key) => {
++            this._authList.actor.reactive = false;
++            Tweener.addTween(this._authList.actor,
++                             { opacity: 0,
++                               time: MESSAGE_FADE_OUT_ANIMATION_TIME,
++                               transition: 'easeOutQuad',
++                               onComplete: () => {
++                                   this._authList.clear();
++                                   this._authList.actor.hide();
++                                   this._userVerifier.selectChoice(this._queryingService, key);
++
++                               }
++                             });
++        });
++        this._authList.actor.hide();
++        this.actor.add(this._authList.actor,
++                       { expand: true,
++                         x_fill: true,
++                         y_fill: false,
++                         x_align: St.Align.START });
++
+         this._message = new St.Label({ opacity: 0,
+                                        styleClass: 'login-dialog-message' });
+         this._message.clutter_text.line_wrap = true;
+@@ -276,6 +300,21 @@ var AuthPrompt = new Lang.Class({
+         this.emit('prompted');
+     },
+ 
++    _onShowChoiceList: function(userVerifier, serviceName, promptMessage, choiceList) {
++        if (this._queryingService)
++            this.clear();
++
++        this._queryingService = serviceName;
++
++        if (this._preemptiveAnswer)
++            this._preemptiveAnswer = null;
++
++        this.nextButton.label = _("Next");
++        this.setChoiceList(promptMessage, choiceList);
++        this.updateSensitivity(true);
++        this.emit('prompted');
++    },
++
+     _onOVirtUserAuthenticated: function() {
+         if (this.verificationStatus != AuthPromptStatus.VERIFICATION_SUCCEEDED)
+             this.reset();
+@@ -404,6 +443,8 @@ var AuthPrompt = new Lang.Class({
+     clear: function() {
+         this._entry.text = '';
+         this.stopSpinning();
++        this._authList.clear();
++        this._authList.actor.hide();
+     },
+ 
+     setPasswordChar: function(passwordChar) {
+@@ -419,12 +460,42 @@ var AuthPrompt = new Lang.Class({
+ 
+         this._label.set_text(question);
+ 
++        this._authList.actor.hide();
+         this._label.show();
+         this._entry.show();
+ 
+         this._entry.grab_key_focus();
+     },
+ 
++    _fadeInChoiceList: function() {
++       this._authList.actor.opacity = 0;
++       this._authList.actor.show();
++       this._authList.actor.reactive = false;
++       Tweener.addTween(this._authList.actor,
++                        { opacity: 255,
++                          time: MESSAGE_FADE_OUT_ANIMATION_TIME,
++                          transition: 'easeOutQuad',
++                          onComplete: () => {
++                              this._authList.actor.reactive = true;
++                          }
++                        });
++    },
++
++    setChoiceList: function(promptMessage, choiceList) {
++        this._authList.clear();
++        this._authList.label.text = promptMessage;
++        for (let key in choiceList) {
++            let text = choiceList[key];
++            this._authList.addItem(key, text);
++        }
++
++        this._label.hide();
++        this._entry.hide();
++        if (this._message.text == "")
++            this._message.hide();
++        this._fadeInChoiceList();
++    },
++
+     getAnswer: function() {
+         let text;
+ 
+@@ -460,6 +531,7 @@ var AuthPrompt = new Lang.Class({
+         else
+             this._message.remove_style_class_name('login-dialog-message-hint');
+ 
++        this._message.show();
+         if (message) {
+             Tweener.removeTweens(this._message);
+             this._message.text = message;
+@@ -475,7 +547,7 @@ var AuthPrompt = new Lang.Class({
+     },
+ 
+     updateSensitivity: function(sensitive) {
+-        this._updateNextButtonSensitivity(sensitive && (this._entry.text.length > 0 || this.verificationStatus == AuthPromptStatus.VERIFYING));
++        this._updateNextButtonSensitivity(sensitive && !this._authList.actor.visible && (this._entry.text.length > 0 || this.verificationStatus == AuthPromptStatus.VERIFYING));
+         this._entry.reactive = sensitive;
+         this._entry.clutter_text.editable = sensitive;
+     },
+diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
+index 6f6de00da..764a96e06 100644
+--- a/js/gdm/loginDialog.js
++++ b/js/gdm/loginDialog.js
+@@ -435,6 +435,11 @@ var LoginDialog = new Lang.Class({
+         this._userManager = AccountsService.UserManager.get_default()
+         this._gdmClient = new Gdm.Client();
+ 
++        try {
++            this._gdmClient.set_enabled_extensions([Gdm.UserVerifierChoiceList.interface_info().name]);
++        } catch(e) {
++        }
++
+         this._settings = new Gio.Settings({ schema_id: GdmUtil.LOGIN_SCREEN_SCHEMA });
+ 
+         this._settings.connect('changed::' + GdmUtil.BANNER_MESSAGE_KEY,
+diff --git a/js/gdm/util.js b/js/gdm/util.js
+index 83a12fb6c..9fc61f55a 100644
+--- a/js/gdm/util.js
++++ b/js/gdm/util.js
+@@ -200,6 +200,10 @@ var ShellUserVerifier = new Lang.Class({
+         if (this._userVerifier) {
+             this._userVerifier.run_dispose();
+             this._userVerifier = null;
++            if (this._userVerifierChoiceList) {
++                this._userVerifierChoiceList.run_dispose();
++                this._userVerifierChoiceList = null;
++            }
+         }
+     },
+ 
+@@ -227,6 +231,10 @@ var ShellUserVerifier = new Lang.Class({
+         this._oVirtCredentialsManager = null;
+     },
+ 
++    selectChoice: function(serviceName, key) {
++        this._userVerifierChoiceList.call_select_choice(serviceName, key, this._cancellable, null);
++    },
++
+     answerQuery: function(serviceName, answer) {
+         if (!this.hasPendingMessages) {
+             this._userVerifier.call_answer_query(serviceName, answer, this._cancellable, null);
+@@ -368,6 +376,11 @@ var ShellUserVerifier = new Lang.Class({
+             return;
+         }
+ 
++        if (client.get_user_verifier_choice_list)
++            this._userVerifierChoiceList = client.get_user_verifier_choice_list();
++        else
++            this._userVerifierChoiceList = null;
++
+         this.reauthenticating = true;
+         this._connectSignals();
+         this._beginVerification();
+@@ -385,6 +398,11 @@ var ShellUserVerifier = new Lang.Class({
+             return;
+         }
+ 
++        if (client.get_user_verifier_choice_list)
++            this._userVerifierChoiceList = client.get_user_verifier_choice_list();
++        else
++            this._userVerifierChoiceList = null;
++
+         this._connectSignals();
+         this._beginVerification();
+         this._hold.release();
+@@ -398,6 +416,9 @@ var ShellUserVerifier = new Lang.Class({
+         this._userVerifier.connect('conversation-stopped', Lang.bind(this, this._onConversationStopped));
+         this._userVerifier.connect('reset', Lang.bind(this, this._onReset));
+         this._userVerifier.connect('verification-complete', Lang.bind(this, this._onVerificationComplete));
++
++        if (this._userVerifierChoiceList)
++            this._userVerifierChoiceList.connect('choice-query', Lang.bind(this, this._onChoiceListQuery));
+     },
+ 
+     _getForegroundService: function() {
+@@ -474,6 +495,13 @@ var ShellUserVerifier = new Lang.Class({
+             this._startService(FINGERPRINT_SERVICE_NAME);
+     },
+ 
++    _onChoiceListQuery: function(client, serviceName, promptMessage, list) {
++        if (!this.serviceIsForeground(serviceName))
++            return;
++
++        this.emit('show-choice-list', serviceName, promptMessage, list.deep_unpack());
++    },
++
+     _onInfo: function(client, serviceName, info) {
+         if (this.serviceIsForeground(serviceName)) {
+             this._queueMessage(info, MessageType.INFO);
+diff --git a/js/ui/unlockDialog.js b/js/ui/unlockDialog.js
+index baead5a6f..d525959c5 100644
+--- a/js/ui/unlockDialog.js
++++ b/js/ui/unlockDialog.js
+@@ -51,7 +51,14 @@ var UnlockDialog = new Lang.Class({
+                                              y_expand: true });
+         this.actor.add_child(this._promptBox);
+ 
+-        this._authPrompt = new AuthPrompt.AuthPrompt(new Gdm.Client(), AuthPrompt.AuthPromptMode.UNLOCK_ONLY);
++        this._gdmClient = new Gdm.Client();
++
++        try {
++            this._gdmClient.set_enabled_extensions([Gdm.UserVerifierChoiceList.interface_info().name]);
++        } catch(e) {
++        }
++
++        this._authPrompt = new AuthPrompt.AuthPrompt(this._gdmClient, AuthPrompt.AuthPromptMode.UNLOCK_ONLY);
+         this._authPrompt.connect('failed', Lang.bind(this, this._fail));
+         this._authPrompt.connect('cancelled', Lang.bind(this, this._fail));
+         this._authPrompt.connect('reset', Lang.bind(this, this._onReset));
+-- 
+2.14.2
+

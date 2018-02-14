@@ -1,0 +1,42 @@
+From 446b7a65536ea60b75f1ec705cd8fa287fda968e Mon Sep 17 00:00:00 2001
+From: Rui Matos <tiagomatos@gmail.com>
+Date: Fri, 8 Nov 2013 13:58:09 +0100
+Subject: [PATCH] extensions: Add a SESSION_MODE extension type
+
+This allows e.g. gnome-tweak-tool to present these extensions in a
+different way since they can't be disabled.
+---
+ js/misc/extensionUtils.js | 3 ++-
+ js/ui/extensionSystem.js  | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/js/misc/extensionUtils.js b/js/misc/extensionUtils.js
+index ca02582c9..3eea38565 100644
+--- a/js/misc/extensionUtils.js
++++ b/js/misc/extensionUtils.js
+@@ -13,7 +13,8 @@ const FileUtils = imports.misc.fileUtils;
+ 
+ var ExtensionType = {
+     SYSTEM: 1,
+-    PER_USER: 2
++    PER_USER: 2,
++    SESSION_MODE: 3
+ };
+ 
+ // Maps uuid -> metadata object
+diff --git a/js/ui/extensionSystem.js b/js/ui/extensionSystem.js
+index 51ce234c2..c2a11b8a5 100644
+--- a/js/ui/extensionSystem.js
++++ b/js/ui/extensionSystem.js
+@@ -316,6 +316,8 @@ function _loadExtensions() {
+     let finder = new ExtensionUtils.ExtensionFinder();
+     finder.connect('extension-found', function(finder, extension) {
+         loadExtension(extension);
++        if (Main.sessionMode.enabledExtensions.indexOf(extension.uuid) != -1)
++            extension.type = ExtensionUtils.ExtensionType.SESSION_MODE;
+     });
+     finder.scanExtensions();
+ }
+-- 
+2.14.2
+

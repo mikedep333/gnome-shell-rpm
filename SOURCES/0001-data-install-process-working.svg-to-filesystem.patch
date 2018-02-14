@@ -1,0 +1,28 @@
+From fa1ec00431d9c0b1592e1b7c56784ef8d8c26a98 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Thu, 8 Jun 2017 12:04:31 -0400
+Subject: [PATCH] data: install process-working.svg to filesystem
+
+This helps prevent unlock failure on inplace upgrades between
+7.3 and 7.4
+---
+ data/Makefile.am | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/data/Makefile.am b/data/Makefile.am
+index 8c01e49d1..f9c198c1c 100644
+--- a/data/Makefile.am
++++ b/data/Makefile.am
+@@ -73,6 +73,9 @@ dist_theme_files =						\
+ 		$(SASSC) -a $< $@; \
+ 	fi
+ 
++themedir = $(pkgdatadir)/theme
++dist_theme_DATA = theme/process-working.svg
++
+ resource_files = $(shell $(GLIB_COMPILE_RESOURCES) --sourcedir=$(srcdir)/theme --generate-dependencies $(srcdir)/gnome-shell-theme.gresource.xml)
+ gnome-shell-theme.gresource: gnome-shell-theme.gresource.xml $(resource_files)
+ 	$(AM_V_GEN) $(GLIB_COMPILE_RESOURCES) --target=$@ --sourcedir=$(srcdir)/theme $<
+-- 
+2.14.2
+
