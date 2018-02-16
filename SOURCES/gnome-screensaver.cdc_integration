@@ -1,4 +1,10 @@
 #%PAM-1.0
+# This file is a copy of /etc/pam.d/gnome-screensaver from
+# gnome-screensaver-3.6.1-14.el7 from EPEL.
+# It gets installed to /etc/pam.d/gnome-screensaver.cdc_integration and only
+# gets copied to /etc/pam.d/gnome-screensaver if it does not exist at package
+# installation time, so as to not make the patched gnome-shell conflict with
+# gnome-screensaver.
 
 # Fedora Core
 auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so
