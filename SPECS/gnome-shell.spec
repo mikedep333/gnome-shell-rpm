@@ -10,6 +10,9 @@ URL:            https://wiki.gnome.org/Projects/GnomeShell
 #VCS:           git:git://git.gnome.org/gnome-shell
 Source0:        http://download.gnome.org/sources/gnome-shell/3.26/%{name}-%{version}.tar.xz
 Source1:        org.gnome.shell.gschema.override
+# Fixes the Centrify issue without a dependency on the gnome-screensaver
+# package.
+Source20: gnome-screensaver.cdc_integration
 
 # Replace Epiphany with Firefox in the default favourite apps list
 Patch1: gnome-shell-favourite-apps-firefox.patch
@@ -204,6 +207,9 @@ cp %{SOURCE1} %{buildroot}/%{_datadir}/glib-2.0/schemas
 
 %find_lang %{name}
 
+mkdir -p %{buildroot}/%{_sysconfdir}/pam.d
+cp %{SOURCE20} %{buildroot}/%{_sysconfdir}/pam.d/gnome-screensaver.cdc_integration
+
 %check
 desktop-file-validate %{buildroot}%{_datadir}/applications/org.gnome.Shell.desktop
 desktop-file-validate %{buildroot}%{_datadir}/applications/gnome-shell-extension-prefs.desktop
@@ -211,6 +217,14 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/evolution-calendar.de
 
 %preun
 glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null ||:
+
+%post
+if [ ! -e "%{_sysconfdir}/pam.d/gnome-screensaver" ]; then
+ cp -p %{_sysconfdir}/pam.d/gnome-screensaver.cdc_integration %{_sysconfdir}/pam.d/gnome-screensaver
+ if [ -e "%{_sysconfdir}/pam.d/smartcard-auth-ac.cdc" ]; then
+  echo "gnome-shell has been updated with the fix for CentrifyDC smartcard integration, gnome-screensaver does not appear to be installed, and Centrify smartcard support appers to be enabled. You need to re-apply CentrifyDC smart-card support (and log out of & back into gnome) for the fix to take effect. You can reapply it by running 'sctool -d && sctool -e', restarting the adclient service, or rebooting." > /dev/stderr
+ fi
+fi
 
 %posttrans
 glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null ||:
@@ -257,6 +271,7 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_mandir}/man1/%{name}.1.gz
 # exclude as these should be in a devel package for st etc
 %exclude %{_datadir}/gtk-doc
+%{_sysconfdir}/pam.d/gnome-screensaver.cdc_integration
 
 %files browser-plugin
 %{_libdir}/mozilla/plugins/*.so
@@ -267,6 +282,10 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 - Fixes the need for Centrify smartcard users to select "switch user" to unlock their session.
   https://bugzilla.redhat.com/show_bug.cgi?id=1238342
   https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
+- Install /etc/pam.d/gnome-screensaver.cdc_integration and only copy it to
+  /etc/pam.d/gnome-screensaver if it DNE. This avoids the dependency on the
+  gnome-screensaver package, but does not conflict with it.
+- If it gets copied, print out that smartcard support needs to be re-applied.
 
 * Wed Feb 14 2018 Ray Strode <rstrode@redhat.com> - 3.26.2-5
 - Make session selection bullet isn't shown on wrong item
