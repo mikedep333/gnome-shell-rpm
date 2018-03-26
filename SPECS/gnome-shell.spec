@@ -1,6 +1,6 @@
 Name:           gnome-shell
 Version:        3.26.2
-Release:        2.0.2.cdc_integration%{?dist}
+Release:        2.0.3.cdc_integration%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -52,6 +52,11 @@ Patch38: 0001-system-don-t-throw-an-exception-if-power-off-disable.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=1238342
 # https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
 patch50: 0001-gdm-Set-the-PAM-smartcard-service-name-for-gnome-scr.patch
+
+# Hopefully fix the memory leaks, particularly when alt-tabbing.
+# Not related to the Centrify integration fix.
+# https://gitlab.gnome.org/GNOME/gnome-shell/issues/64
+Patch60: 0001-menutracker-Fix-a-small-memory-leak.patch
 
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.45.4
@@ -275,6 +280,11 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Mon Mar 26 2018 Mike DePaulo (GFDL) - 3.26.2-2.0.3.cdc_integration
+- Hopefully fix the memory leaks, particularly when alt-tabbing.
+  Done via a backported upstream patch.
+  Not related to the Centrify integration fix.
+
 * Thu Feb 15 2018 Mike DePaulo (GFDL) - 3.26.2-2.0.2
 - Install /etc/pam.d/gnome-screensaver.cdc_integration and only copy it to
   /etc/pam.d/gnome-screensaver if it DNE. This avoids the dependency on the

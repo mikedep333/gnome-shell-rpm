@@ -1,0 +1,25 @@
+From 902f8b8a24423f28cdda6c69ddb4ffdec951f88d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Mon, 26 Feb 2018 19:21:56 +0100
+Subject: [PATCH] menutracker: Fix a small memory leak
+
+https://gitlab.gnome.org/GNOME/gnome-shell/issues/64
+---
+ src/gtkmenutrackeritem.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/gtkmenutrackeritem.c b/src/gtkmenutrackeritem.c
+index bb9a1f4..b67b2df 100644
+--- a/src/gtkmenutrackeritem.c
++++ b/src/gtkmenutrackeritem.c
+@@ -200,6 +200,7 @@ gtk_menu_tracker_item_finalize (GObject *object)
+   GtkMenuTrackerItem *self = GTK_MENU_TRACKER_ITEM (object);
+ 
+   g_free (self->action_namespace);
++  g_free (self->action_and_target);
+ 
+   if (self->observable)
+     g_object_unref (self->observable);
+-- 
+1.8.3.1
+
