@@ -55,6 +55,11 @@ Patch39: 0001-padOsd-Ensure-to-pick-pad-devices-only.patch
 # https://centrify.force.com/support/Article/KB-7415-Unable-to-unlock-screen-with-Smart-Card-on-RHEL-7/
 patch50: 0001-gdm-Set-the-PAM-smartcard-service-name-for-gnome-scr.patch
 
+# Hopefully fix the memory leaks, particularly when alt-tabbing.
+# Not related to the Centrify integration fix.
+# https://gitlab.gnome.org/GNOME/gnome-shell/issues/64
+Patch60: 0001-menutracker-Fix-a-small-memory-leak.patch
+
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.45.4
 %define gjs_version 1.47.0
@@ -286,6 +291,9 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
   /etc/pam.d/gnome-screensaver if it DNE. This avoids the dependency on the
   gnome-screensaver package, but does not conflict with it.
 - If it gets copied, print out that smartcard support needs to be re-applied.
+- Hopefully fix the memory leaks, particularly when alt-tabbing.
+  Done via a backported upstream patch.
+  Not related to the Centrify integration fix.
 
 * Wed Feb 14 2018 Ray Strode <rstrode@redhat.com> - 3.26.2-5
 - Make session selection bullet isn't shown on wrong item
