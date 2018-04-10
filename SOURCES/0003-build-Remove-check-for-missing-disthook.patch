@@ -1,0 +1,38 @@
+From 49102593eb5776e2edc535147e8277cdcad1e5d9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Fri, 6 Oct 2017 18:58:21 +0200
+Subject: [PATCH] build: Remove check-for-missing disthook
+
+The script has been removed upstream, but the re-added autotools
+support still references it; we don't have any use for a disthook
+downstream, so just update the Makefile accordingly.
+---
+ Makefile.am | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index eba7d2b28..107a00a05 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -14,8 +14,7 @@ endif
+ EXTRA_DIST =		\
+ 	.project	\
+ 	.settings	\
+-	autogen.sh	\
+-	tools/check-for-missing.py
++	autogen.sh
+ 
+ # These are files checked into Git that we don't want to distribute
+ DIST_EXCLUDE =					\
+@@ -26,8 +25,4 @@ DIST_EXCLUDE =					\
+ 	MAINTAINERS				\
+ 	tools/build/*
+ 
+-distcheck-hook:
+-	@echo "Checking disted files against files in git"
+-	@$(srcdir)/tools/check-for-missing.py $(srcdir) $(distdir) $(DIST_EXCLUDE)
+-
+ DISTCHECK_CONFIGURE_FLAGS = --enable-gtk-doc --enable-man
+-- 
+2.14.2
+

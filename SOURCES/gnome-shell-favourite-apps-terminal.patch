@@ -1,8 +1,17 @@
+From 92845e02be66c676261d204e06c2b0ea55722738 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
+Date: Thu, 9 Mar 2017 14:44:32 +0100
+Subject: [PATCH] appFavorites: Add terminal
+
+---
+ data/org.gnome.shell.gschema.xml.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/data/org.gnome.shell.gschema.xml.in b/data/org.gnome.shell.gschema.xml.in
-index 1e35ca3..95b8c52 100644
+index 8fb7f7291..6f1459c86 100644
 --- a/data/org.gnome.shell.gschema.xml.in
 +++ b/data/org.gnome.shell.gschema.xml.in
-@@ -31,7 +31,7 @@
+@@ -39,7 +39,7 @@
        </description>
      </key>
      <key name="favorite-apps" type="as">
@@ -11,3 +20,6 @@ index 1e35ca3..95b8c52 100644
        <summary>List of desktop file IDs for favorite applications</summary>
        <description>
          The applications corresponding to these identifiers
+-- 
+2.14.2
+

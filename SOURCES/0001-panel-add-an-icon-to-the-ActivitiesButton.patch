@@ -1,4 +1,4 @@
-From ea91b6c39c1c17abca0a5f34b3047a5cd5314127 Mon Sep 17 00:00:00 2001
+From 7196f5d0a60243e218d6a906b9db4f3b6608b47c Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 15 Jan 2014 16:45:34 -0500
 Subject: [PATCH] panel: add an icon to the ActivitiesButton
@@ -11,38 +11,38 @@ Requested by brand
  3 files changed, 14 insertions(+), 1 deletion(-)
 
 diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
-index 28922be77..3ce5278e1 100644
+index 51477e713..e7b94624a 100644
 --- a/data/theme/gnome-shell-high-contrast.css
 +++ b/data/theme/gnome-shell-high-contrast.css
-@@ -685,6 +685,9 @@ StScrollBar {
+@@ -688,6 +688,9 @@ StScrollBar {
        -st-icon-style: symbolic;
        margin-left: 4px;
        margin-right: 4px; }
 +    #panel .panel-button .panel-logo-icon {
 +      padding-right: .4em;
 +      icon-size: 1em; }
-     #panel .panel-button:hover {
-       color: white; }
-     #panel .panel-button:active, #panel .panel-button:overview, #panel .panel-button:focus, #panel .panel-button:checked {
+     #panel .panel-button .system-status-icon,
+     #panel .panel-button .app-menu-icon > StIcon,
+     #panel .panel-button .popup-menu-arrow {
 diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
-index 690722372..342bebe9d 100644
+index 6aab70867..c1207dcd5 100644
 --- a/data/theme/gnome-shell.css
 +++ b/data/theme/gnome-shell.css
-@@ -685,6 +685,9 @@ StScrollBar {
+@@ -688,6 +688,9 @@ StScrollBar {
        -st-icon-style: symbolic;
        margin-left: 4px;
        margin-right: 4px; }
 +    #panel .panel-button .panel-logo-icon {
 +      padding-right: .4em;
 +      icon-size: 1em; }
-     #panel .panel-button:hover {
-       color: white; }
-     #panel .panel-button:active, #panel .panel-button:overview, #panel .panel-button:focus, #panel .panel-button:checked {
+     #panel .panel-button .system-status-icon,
+     #panel .panel-button .app-menu-icon > StIcon,
+     #panel .panel-button .popup-menu-arrow {
 diff --git a/js/ui/panel.js b/js/ui/panel.js
-index e05a6223c..d07bbaa7b 100644
+index d7c8397b5..3ec43210e 100644
 --- a/js/ui/panel.js
 +++ b/js/ui/panel.js
-@@ -409,11 +409,18 @@ const ActivitiesButton = new Lang.Class({
+@@ -409,11 +409,18 @@ var ActivitiesButton = new Lang.Class({
  
          this.actor.name = 'panelActivities';
  
@@ -63,5 +63,5 @@ index e05a6223c..d07bbaa7b 100644
          this.actor.label_actor = this._label;
  
 -- 
-2.12.0
+2.14.2
 

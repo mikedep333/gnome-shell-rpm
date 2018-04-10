@@ -1,4 +1,4 @@
-From 03f5d81342e096ab331308c99ac4b1c15dd5a448 Mon Sep 17 00:00:00 2001
+From 7f2d3668cf8c7a6b8aaab2c52f7e67ab01e5ba4d Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 18 Aug 2015 12:02:17 -0400
 Subject: [PATCH] gdm: honor timed login delay even if animations disabled
@@ -18,10 +18,10 @@ animation from a main loop timeout, instead of using the tweener api.
  1 file changed, 27 insertions(+), 10 deletions(-)
 
 diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
-index 0b6c0b50a..45eca18f7 100644
+index 1cae3db85..c1262b1e8 100644
 --- a/js/gdm/loginDialog.js
 +++ b/js/gdm/loginDialog.js
-@@ -107,20 +107,34 @@ const UserListItem = new Lang.Class({
+@@ -126,20 +126,34 @@ var UserListItem = new Lang.Class({
          let hold = new Batch.Hold();
  
          this.hideTimedLoginIndicator();
@@ -67,5 +67,5 @@ index 0b6c0b50a..45eca18f7 100644
      }
  });
 -- 
-2.12.0
+2.14.2
 

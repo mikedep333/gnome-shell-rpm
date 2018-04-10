@@ -1,6 +1,6 @@
-From bd1b67c5901023dd9919f15a45226e987b4fea42 Mon Sep 17 00:00:00 2001
+From e95369c7fc044867b074775d7e0bab148180f4fb Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
-Date: Wed, 1 May 2013 01:33:16 +0200
+Date: Thu, 9 Mar 2017 14:44:03 +0100
 Subject: [PATCH] Add 'yelp' to default favorites
 
 Help should be easily available, so add it to the default favorites.
@@ -9,10 +9,10 @@ Help should be easily available, so add it to the default favorites.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/data/org.gnome.shell.gschema.xml.in b/data/org.gnome.shell.gschema.xml.in
-index 9ba2418..1e35ca3 100644
+index 868d8edc9..8fb7f7291 100644
 --- a/data/org.gnome.shell.gschema.xml.in
 +++ b/data/org.gnome.shell.gschema.xml.in
-@@ -31,7 +31,7 @@
+@@ -39,7 +39,7 @@
        </description>
      </key>
      <key name="favorite-apps" type="as">
@@ -22,5 +22,5 @@ index 9ba2418..1e35ca3 100644
        <description>
          The applications corresponding to these identifiers
 -- 
-1.8.3.1
+2.14.2
 

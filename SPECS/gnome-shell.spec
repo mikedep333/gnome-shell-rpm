@@ -1,6 +1,6 @@
 Name:           gnome-shell
-Version:        3.22.3
-Release:        17%{?dist}
+Version:        3.26.2
+Release:        5%{?dist}
 Summary:        Window management and application launching for GNOME
 
 Group:          User Interface/Desktops
@@ -8,13 +8,19 @@ License:        GPLv2+
 Provides:       desktop-notification-daemon
 URL:            https://wiki.gnome.org/Projects/GnomeShell
 #VCS:           git:git://git.gnome.org/gnome-shell
-Source0:        http://download.gnome.org/sources/gnome-shell/3.22/%{name}-%{version}.tar.xz
+Source0:        http://download.gnome.org/sources/gnome-shell/3.26/%{name}-%{version}.tar.xz
 Source1:        org.gnome.shell.gschema.override
 
 # Replace Epiphany with Firefox in the default favourite apps list
 Patch1: gnome-shell-favourite-apps-firefox.patch
 Patch2: gnome-shell-favourite-apps-yelp.patch
 Patch3: gnome-shell-favourite-apps-terminal.patch
+
+# el7 build fixes
+Patch5: 0001-Revert-build-Drop-autotools-support.patch
+Patch6: 0002-Revert-build-Remove-included-Makefiles-as-well.patch
+Patch7: 0003-build-Remove-check-for-missing-disthook.patch
+Patch8: 0004-Revert-build-Use-new-mkenums_simple-function.patch
 
 # GDM/Lock stuff
 Patch10: 0001-gdm-honor-timed-login-delay-even-if-animations-disab.patch
@@ -23,35 +29,28 @@ Patch12: 0001-screenShield-unblank-when-inserting-smartcard.patch
 Patch13: enforce-smartcard-at-unlock.patch
 Patch14: disable-unlock-entry-until-question.patch
 Patch15: allow-timed-login-with-no-user-list.patch
-Patch16: 0001-gdm-Handle-absence-of-Fprint.Manager-service.patch
-Patch17: respect-lockscreen-lockdown.patch
-Patch18: 0001-gdmUtil-Fix-auth-prompt-drawing-over-user-list.patch
-Patch19: 0001-data-install-process-working.svg-to-filesystem.patch
-Patch20: 0001-authPrompt-allow-empty-response-to-PAM-messages.patch
-Patch21: 0001-objectManager-handle-proxies-coming-and-going.patch
-Patch22: 0002-objectManager-handle-object-manager-sending-empty-ar.patch
-Patch23: 0001-loginDialog-make-info-messages-themed.patch
+Patch16: 0001-data-install-process-working.svg-to-filesystem.patch
+Patch17: 0001-loginDialog-make-info-messages-themed.patch
+Patch18: 0001-gdm-add-AuthList-control.patch
+Patch19: 0002-gdmUtil-enable-support-for-GDM-s-ChoiceList-PAM-exte.patch
+Patch20: 0001-loginDialog-only-emit-session-activated-on-user-acti.patch
 
 # Misc.
-Patch30: support-headless-mode.patch
-Patch31: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
-Patch32: 0001-extensions-Add-a-SESSION_MODE-extension-type.patch
-Patch33: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
-Patch34: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
-Patch35: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
-Patch36: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
-Patch37: 0001-network-Summarize-sections-with-too-many-devices.patch
-Patch38: 0001-windowMenu-Bring-back-workspaces-submenu-for-static-.patch
-Patch39: keep-vpn-list-sorted.patch
-Patch40: 0001-network-Close-Wifi-selection-dialog-when-appropriate.patch
-Patch41: 0001-calendar-server-Remove-unused-variables-and-function.patch
-Patch42: 0001-st-Add-missing-NULL-check.patch
-patch43: 0001-network-Fix-initial-visibility-of-summary-item.patch
+Patch30: 0001-shellDBus-Add-a-DBus-method-to-load-a-single-extensi.patch
+Patch31: 0001-extensions-Add-a-SESSION_MODE-extension-type.patch
+Patch32: 0001-magnifier-don-t-spew-to-console-when-focus-moves-aro.patch
+Patch33: 0001-extensionSystem-Notify-about-extension-issues-on-upd.patch
+Patch34: 0001-panel-add-an-icon-to-the-ActivitiesButton.patch
+Patch35: 0001-app-Fall-back-to-window-title-instead-of-WM_CLASS.patch
+Patch36: 0001-windowMenu-Bring-back-workspaces-submenu-for-static-.patch
+Patch37: 0001-global-Allow-overriding-the-override-schema.patch
+Patch38: 0001-system-don-t-throw-an-exception-if-power-off-disable.patch
+Patch39: 0001-padOsd-Ensure-to-pick-pad-devices-only.patch
 
 %define gnome_bluetooth_version 1:3.9.0
 %define gobject_introspection_version 1.45.4
-%define gjs_version 1.39.0
-%define mutter_version 3.22.1
+%define gjs_version 1.47.0
+%define mutter_version 3.25.90
 %define gtk3_version 3.15.0
 %define eds_version 3.13.90
 %define gnome_desktop_version 3.7.90
@@ -82,6 +81,7 @@ BuildRequires:  json-glib-devel >= %{json_glib_version}
 BuildRequires:  upower-devel
 BuildRequires:  libgnome-keyring-devel
 BuildRequires:  libnm-gtk-devel
+BuildRequires:  mesa-libGL-devel
 BuildRequires:  NetworkManager-glib-devel
 BuildRequires:  polkit-devel
 BuildRequires:  startup-notification-devel
@@ -149,6 +149,11 @@ Requires:       python%{_isa}
 %else
 Requires:       python3%{_isa}
 %endif
+# needed for the dual-GPU launch menu
+#Requires:       switcheroo-control
+# needed for clocks/weather integration
+Requires:       geoclue2-libs%{?_isa}
+Requires:       libgweather%{?_isa}
 
 %description
 GNOME Shell provides core user interface functions for the GNOME 3 desktop,
@@ -170,14 +175,13 @@ be used only by extensions.gnome.org.
 %prep
 %autosetup -S git
 
+%build
 %if 0%{?rhel}
 # Use Python 2
-sed -i -e 's|/usr/bin/python3|/usr/bin/python|' tools/check-for-missing.py
 sed -i -e 's/AM_PATH_PYTHON(\[3\])/AM_PATH_PYTHON([2.5])/' configure.ac
 autoreconf -fi
 %endif
 
-%build
 (if ! test -x configure; then NOCONFIGURE=1 ./autogen.sh; fi;
  %configure --disable-static --disable-compile-warnings)
 make V=1 %{?_smp_mflags}
@@ -226,6 +230,7 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_datadir}/dbus-1/services/org.gnome.Shell.CalendarServer.service
 %{_datadir}/dbus-1/services/org.gnome.Shell.HotplugSniffer.service
 %{_datadir}/dbus-1/services/org.gnome.Shell.PortalHelper.service
+%{_datadir}/dbus-1/interfaces/org.gnome.Shell.PadOsd.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.Shell.Screencast.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.Shell.Screenshot.xml
 %{_datadir}/dbus-1/interfaces/org.gnome.ShellSearchProvider.xml
@@ -252,6 +257,38 @@ glib-compile-schemas --allow-any-name %{_datadir}/glib-2.0/schemas &> /dev/null 
 %{_libdir}/mozilla/plugins/*.so
 
 %changelog
+* Wed Feb 14 2018 Ray Strode <rstrode@redhat.com> - 3.26.2-5
+- Make session selection bullet isn't shown on wrong item
+  Resolves: #1527145
+
+* Tue Feb 13 2018 Ray Strode <rstrode@redhat.com> - 3.26.2-4
+- Fix timed login
+  Resolves: #1527143
+
+* Wed Feb 07 2018 Carlos Garnacho <cgarnach@redhat.com> - 3.26.2-3
+- Fix pad device lookup from event node path
+  Resolves: #1537879
+
+* Mon Nov 13 2017 Ray Strode <rstrode@redhat.com> - 3.26.2-2
+- Don't throw an exception is poweroff is disabled
+  Resolves: #1512662
+
+* Fri Nov 03 2017 Kalev Lember <klember@redhat.com> - 3.26.2-1
+- Update to 3.26.2
+- Related: #1481381
+
+* Thu Oct 26 2017 Florian Müllner <fmuellner@redhat.com> - 3.26.1-2
+- Add CLI option to specify a custom override schema
+  Resolves: #1432505
+
+* Fri Oct 06 2017 Florian Müllner <fmuellner@redhat.com> - 3.26.1-1
+- Update to 3.26.1
+  Resolves: #1481381
+
+* Wed Jul 26 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-18
+- Support GDM ChoiceList pam extensions
+  Related: #1413900
+
 * Mon Jun 26 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-17
 - Fix PAM info messages in unlock screen
   Related: #1449359

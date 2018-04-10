@@ -1,4 +1,4 @@
-From 1c4f08191702f6a06e46bc2a3f6dea2d96c851e7 Mon Sep 17 00:00:00 2001
+From 4104864c0e6e9e39e09353d86a67668109abe272 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
 Date: Wed, 20 May 2015 16:44:00 +0200
 Subject: [PATCH] app: Fall back to window title instead of WM_CLASS
@@ -11,7 +11,7 @@ a .desktop file ...
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/shell-app.c b/src/shell-app.c
-index 7f61dc369..ab30abf11 100644
+index dbf537ce9..84fcc97bf 100644
 --- a/src/shell-app.c
 +++ b/src/shell-app.c
 @@ -265,7 +265,7 @@ shell_app_get_name (ShellApp *app)
@@ -24,5 +24,5 @@ index 7f61dc369..ab30abf11 100644
          name = C_("program", "Unknown");
        return name;
 -- 
-2.12.0
+2.14.2
 

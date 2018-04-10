@@ -1,4 +1,4 @@
-From f3f5643134c317546c88ff11b974f1a04ad780ff Mon Sep 17 00:00:00 2001
+From fb872747e5697098c87e97bab13c4095b653053b Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 19 Apr 2016 13:12:46 -0400
 Subject: [PATCH] loginDialog: allow timed login with disabled user list
@@ -11,10 +11,10 @@ Subject: [PATCH] loginDialog: allow timed login with disabled user list
  4 files changed, 73 insertions(+), 3 deletions(-)
 
 diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
-index 3ce5278e1..0325fea87 100644
+index e7b94624a..364725de3 100644
 --- a/data/theme/gnome-shell-high-contrast.css
 +++ b/data/theme/gnome-shell-high-contrast.css
-@@ -1691,6 +1691,9 @@ StScrollBar {
+@@ -1716,6 +1716,9 @@ StScrollBar {
    padding-bottom: 12px;
    spacing: 8px;
    width: 23em; }
@@ -25,10 +25,10 @@ index 3ce5278e1..0325fea87 100644
  .login-dialog-prompt-label {
    color: #bebeb6;
 diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
-index 342bebe9d..e2a442ecb 100644
+index c1207dcd5..5d754a2bb 100644
 --- a/data/theme/gnome-shell.css
 +++ b/data/theme/gnome-shell.css
-@@ -1691,6 +1691,9 @@ StScrollBar {
+@@ -1716,6 +1716,9 @@ StScrollBar {
    padding-bottom: 12px;
    spacing: 8px;
    width: 23em; }
@@ -39,7 +39,7 @@ index 342bebe9d..e2a442ecb 100644
  .login-dialog-prompt-label {
    color: #bebeb6;
 diff --git a/js/gdm/authPrompt.js b/js/gdm/authPrompt.js
-index 6327633d9..ae03a5b49 100644
+index 9affbdd5f..366f34687 100644
 --- a/js/gdm/authPrompt.js
 +++ b/js/gdm/authPrompt.js
 @@ -2,6 +2,7 @@
@@ -48,9 +48,9 @@ index 6327633d9..ae03a5b49 100644
  const Gio = imports.gi.Gio;
 +const GLib = imports.gi.GLib;
  const Lang = imports.lang;
+ const Pango = imports.gi.Pango;
  const Signals = imports.signals;
- const St = imports.gi.St;
-@@ -118,6 +119,11 @@ const AuthPrompt = new Lang.Class({
+@@ -119,6 +120,11 @@ var AuthPrompt = new Lang.Class({
  
          this._entry.grab_key_focus();
  
@@ -62,7 +62,7 @@ index 6327633d9..ae03a5b49 100644
          this._message = new St.Label({ opacity: 0,
                                         styleClass: 'login-dialog-message' });
          this._message.clutter_text.line_wrap = true;
-@@ -142,6 +148,41 @@ const AuthPrompt = new Lang.Class({
+@@ -144,6 +150,41 @@ var AuthPrompt = new Lang.Class({
          this._defaultButtonWell.add_child(this._spinner.actor);
      },
  
@@ -105,10 +105,10 @@ index 6327633d9..ae03a5b49 100644
          if (this._preemptiveAnswerWatchId) {
              this._idleMonitor.remove_watch(this._preemptiveAnswerWatchId);
 diff --git a/js/gdm/loginDialog.js b/js/gdm/loginDialog.js
-index 45eca18f7..9034d732e 100644
+index c1262b1e8..6f6de00da 100644
 --- a/js/gdm/loginDialog.js
 +++ b/js/gdm/loginDialog.js
-@@ -729,6 +729,9 @@ const LoginDialog = new Lang.Class({
+@@ -756,6 +756,9 @@ var LoginDialog = new Lang.Class({
  
              if (this._authPrompt.verificationStatus == AuthPrompt.AuthPromptStatus.NOT_VERIFYING)
                  this._authPrompt.reset();
@@ -118,7 +118,7 @@ index 45eca18f7..9034d732e 100644
          }
      },
  
-@@ -984,6 +987,9 @@ const LoginDialog = new Lang.Class({
+@@ -1014,6 +1017,9 @@ var LoginDialog = new Lang.Class({
      },
  
      _showTimedLoginAnimation: function() {
@@ -128,7 +128,7 @@ index 45eca18f7..9034d732e 100644
          this._timedLoginItem.actor.grab_key_focus();
          return this._timedLoginItem.showTimedLoginIndicator(this._timedLoginAnimationTime);
      },
-@@ -1011,19 +1017,31 @@ const LoginDialog = new Lang.Class({
+@@ -1041,19 +1047,31 @@ var LoginDialog = new Lang.Class({
      },
  
      _startTimedLogin: function(userName, delay) {
@@ -162,7 +162,7 @@ index 45eca18f7..9034d732e 100644
                           // If we're just starting out, start on the right
                           // item.
                           if (!this._userManager.is_loaded) {
-@@ -1034,6 +1052,9 @@ const LoginDialog = new Lang.Class({
+@@ -1064,6 +1082,9 @@ var LoginDialog = new Lang.Class({
                       this._blockTimedLoginUntilIdle,
  
                       function() {
@@ -172,7 +172,7 @@ index 45eca18f7..9034d732e 100644
                           this._userList.scrollToItem(this._timedLoginItem);
                       },
  
-@@ -1058,7 +1079,9 @@ const LoginDialog = new Lang.Class({
+@@ -1088,7 +1109,9 @@ var LoginDialog = new Lang.Class({
          if (this._timedLoginItem)
              this._timedLoginItem.hideTimedLoginIndicator();
  
@@ -184,5 +184,5 @@ index 45eca18f7..9034d732e 100644
          if (userName)
              this._startTimedLogin(userName, this._timedLoginDelay);
 -- 
-2.12.0
+2.14.2
 

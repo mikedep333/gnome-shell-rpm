@@ -1,4 +1,4 @@
-From dd7d9565555fcfc9ecc730e421ec2145988ea755 Mon Sep 17 00:00:00 2001
+From 8d085a574b5b5d1055451a1b430fcf5cb9af4859 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
 Date: Tue, 14 Mar 2017 17:04:36 +0100
 Subject: [PATCH] windowMenu: Bring back workspaces submenu for static
@@ -9,23 +9,14 @@ moving to a specific workspace was intentionally left out; some people
 are quite attached to it though, so bring it back when static workspaces
 are used.
 ---
- js/ui/windowMenu.js | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ js/ui/windowMenu.js | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/js/ui/windowMenu.js b/js/ui/windowMenu.js
-index 5cd6802e6..6b7f6f7c9 100644
+index 7aa57beb3..8751c4c4d 100644
 --- a/js/ui/windowMenu.js
 +++ b/js/ui/windowMenu.js
-@@ -97,8 +97,6 @@ const WindowMenu = new Lang.Class({
-             if (window.is_always_on_all_workspaces())
-                 item.setSensitive(false);
- 
--            let nWorkspaces = global.screen.n_workspaces;
--
-             if (!isSticky) {
-                 let workspace = window.get_workspace();
-                 if (workspace != workspace.get_neighbor(Meta.MotionDirection.LEFT)) {
-@@ -121,6 +119,22 @@ const WindowMenu = new Lang.Class({
+@@ -119,6 +119,22 @@ var WindowMenu = new Lang.Class({
                          window.change_workspace(workspace.get_neighbor(Meta.MotionDirection.DOWN));
                      }));
                  }
@@ -49,5 +40,5 @@ index 5cd6802e6..6b7f6f7c9 100644
          }
  
 -- 
-2.12.0
+2.14.2
 

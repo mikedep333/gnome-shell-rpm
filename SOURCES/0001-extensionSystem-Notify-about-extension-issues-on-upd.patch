@@ -1,4 +1,4 @@
-From 8a2efe0e5c239a18ad38bba966d73c992eed9dc7 Mon Sep 17 00:00:00 2001
+From b3132648a9a15b9c151bde6733cb0c252dac6a25 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Florian=20M=C3=BCllner?= <fmuellner@gnome.org>
 Date: Mon, 21 Sep 2015 20:18:12 +0200
 Subject: [PATCH] extensionSystem: Notify about extension issues on update
@@ -8,7 +8,7 @@ Subject: [PATCH] extensionSystem: Notify about extension issues on update
  1 file changed, 32 insertions(+)
 
 diff --git a/js/ui/extensionSystem.js b/js/ui/extensionSystem.js
-index 810fa1577..fe0d8117f 100644
+index c2a11b8a5..5e78618c4 100644
 --- a/js/ui/extensionSystem.js
 +++ b/js/ui/extensionSystem.js
 @@ -7,6 +7,7 @@ const GLib = imports.gi.GLib;
@@ -19,7 +19,7 @@ index 810fa1577..fe0d8117f 100644
  const ExtensionUtils = imports.misc.extensionUtils;
  const Main = imports.ui.main;
  
-@@ -286,6 +287,36 @@ function _onVersionValidationChanged() {
+@@ -306,6 +307,36 @@ function _onVersionValidationChanged() {
      }
  }
  
@@ -34,7 +34,7 @@ index 810fa1577..fe0d8117f 100644
 +    if (updateStamp.query_exists(null))
 +        return;
 +
-+    GLib.mkdir_with_parents (pkgCacheDir, 0755);
++    GLib.mkdir_with_parents (pkgCacheDir, 0o755);
 +    updateStamp.create(0, null).close(null);
 +
 +   let nOutdated = enabledExtensions.reduce(function(n, uuid) {
@@ -55,8 +55,8 @@ index 810fa1577..fe0d8117f 100644
 +
  function _loadExtensions() {
      global.settings.connect('changed::' + ENABLED_EXTENSIONS_KEY, onEnabledExtensionsChanged);
-     global.settings.connect('changed::' + EXTENSION_DISABLE_VERSION_CHECK_KEY, _onVersionValidationChanged);
-@@ -299,6 +330,7 @@ function _loadExtensions() {
+     global.settings.connect('changed::' + DISABLE_USER_EXTENSIONS_KEY, onEnabledExtensionsChanged);
+@@ -320,6 +351,7 @@ function _loadExtensions() {
              extension.type = ExtensionUtils.ExtensionType.SESSION_MODE;
      });
      finder.scanExtensions();
@@ -65,5 +65,5 @@ index 810fa1577..fe0d8117f 100644
  
  function enableAllExtensions() {
 -- 
-2.12.0
+2.14.2
 

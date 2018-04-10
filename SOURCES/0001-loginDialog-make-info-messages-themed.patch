@@ -1,4 +1,4 @@
-From 73fa23c14f1582dc959c767454459ab8051e7e5d Mon Sep 17 00:00:00 2001
+From b82109bd0c04a8b050a7ad18cd4b2c1d4186fa61 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Mon, 26 Jun 2017 14:35:05 -0400
 Subject: [PATCH] loginDialog: make info messages themed
@@ -11,37 +11,10 @@ show up invisible.
  2 files changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/data/theme/gnome-shell-high-contrast.css b/data/theme/gnome-shell-high-contrast.css
-index 0325fea87..d89ec4a3a 100644
+index 52dc81863..b807db8ae 100644
 --- a/data/theme/gnome-shell-high-contrast.css
 +++ b/data/theme/gnome-shell-high-contrast.css
-@@ -1598,63 +1598,65 @@ StScrollBar {
-         box-shadow: inset 0 1px #5d696d;
-         text-shadow: 0 1px black;
-         icon-shadow: 0 1px black; }
-       .login-dialog .modal-dialog-button:default:active {
-         color: white;
-         border-color: rgba(0, 0, 0, 0.7);
-         background-color: #1c5187;
-         box-shadow: inset 0 0 black;
-         text-shadow: none;
-         icon-shadow: none; }
-       .login-dialog .modal-dialog-button:default:insensitive {
-         color: gray;
-         border-color: rgba(0, 0, 0, 0.7);
-         background-color: rgba(62, 67, 69, 0.7);
-         box-shadow: none;
-         text-shadow: none;
-         icon-shadow: none; }
- 
- .login-dialog-logo-bin {
-   padding: 24px 0px; }
- 
- .login-dialog-banner {
-   color: #d6d6d1; }
- 
- .login-dialog-button-box {
-   spacing: 5px; }
- 
+@@ -1647,9 +1647,11 @@ StScrollBar {
  .login-dialog-message-warning {
    color: #f57900; }
  
@@ -55,65 +28,11 @@ index 0325fea87..d89ec4a3a 100644
  
  .login-dialog-user-selection-box {
    padding: 100px 0px; }
-   .login-dialog-user-selection-box .login-dialog-not-listed-label {
-     padding-left: 2px; }
-     .login-dialog-not-listed-button:focus .login-dialog-user-selection-box .login-dialog-not-listed-label, .login-dialog-not-listed-button:hover .login-dialog-user-selection-box .login-dialog-not-listed-label {
-       color: #eeeeec; }
- 
- .login-dialog-not-listed-label {
-   font-size: 90%;
-   font-weight: bold;
-   color: #a6a69b;
-   padding-top: 1em; }
- 
- .login-dialog-user-list-view {
-   -st-vfade-offset: 1em; }
- 
- .login-dialog-user-list {
-   spacing: 12px;
-   padding: .2em;
-   width: 23em; }
-   .login-dialog-user-list:expanded .login-dialog-user-list-item:focus {
-     background-color: #215d9c;
-     color: #ffffff; }
-   .login-dialog-user-list:expanded .login-dialog-user-list-item:logged-in {
-     border-right: 2px solid #215d9c; }
- 
- .login-dialog-user-list-item {
-   border-radius: 5px;
-   padding: .2em;
 diff --git a/data/theme/gnome-shell.css b/data/theme/gnome-shell.css
-index e2a442ecb..bbc6b8434 100644
+index a320f41a0..dd37cdf7b 100644
 --- a/data/theme/gnome-shell.css
 +++ b/data/theme/gnome-shell.css
-@@ -1598,63 +1598,65 @@ StScrollBar {
-         box-shadow: inset 0 1px #5d696d;
-         text-shadow: 0 1px black;
-         icon-shadow: 0 1px black; }
-       .login-dialog .modal-dialog-button:default:active {
-         color: white;
-         border-color: rgba(0, 0, 0, 0.7);
-         background-color: #1c5187;
-         box-shadow: inset 0 0 black;
-         text-shadow: none;
-         icon-shadow: none; }
-       .login-dialog .modal-dialog-button:default:insensitive {
-         color: #949796;
-         border-color: rgba(0, 0, 0, 0.7);
-         background-color: rgba(66, 72, 73, 0.7);
-         box-shadow: none;
-         text-shadow: none;
-         icon-shadow: none; }
- 
- .login-dialog-logo-bin {
-   padding: 24px 0px; }
- 
- .login-dialog-banner {
-   color: #d6d6d1; }
- 
- .login-dialog-button-box {
-   spacing: 5px; }
- 
+@@ -1647,9 +1647,11 @@ StScrollBar {
  .login-dialog-message-warning {
    color: #f57900; }
  
@@ -127,33 +46,6 @@ index e2a442ecb..bbc6b8434 100644
  
  .login-dialog-user-selection-box {
    padding: 100px 0px; }
-   .login-dialog-user-selection-box .login-dialog-not-listed-label {
-     padding-left: 2px; }
-     .login-dialog-not-listed-button:focus .login-dialog-user-selection-box .login-dialog-not-listed-label, .login-dialog-not-listed-button:hover .login-dialog-user-selection-box .login-dialog-not-listed-label {
-       color: #eeeeec; }
- 
- .login-dialog-not-listed-label {
-   font-size: 90%;
-   font-weight: bold;
-   color: #a6a69b;
-   padding-top: 1em; }
- 
- .login-dialog-user-list-view {
-   -st-vfade-offset: 1em; }
- 
- .login-dialog-user-list {
-   spacing: 12px;
-   padding: .2em;
-   width: 23em; }
-   .login-dialog-user-list:expanded .login-dialog-user-list-item:focus {
-     background-color: #215d9c;
-     color: #ffffff; }
-   .login-dialog-user-list:expanded .login-dialog-user-list-item:logged-in {
-     border-right: 2px solid #215d9c; }
- 
- .login-dialog-user-list-item {
-   border-radius: 5px;
-   padding: .2em;
 -- 
-2.13.0
+2.14.2
 
